@@ -928,6 +928,13 @@ mark.empty{font-style:italic;font-weight:400}
 .bs-teams label{display:flex;align-items:center;gap:6px;background:var(--soft);border-radius:999px;padding:6px 12px;font-size:12.5px;cursor:pointer}
 .bs-teams i{color:var(--ink3);font-style:normal;font-size:11px}
 .duo .nm .bline{font-size:11.5px}
+/* ===== Nuvem ===== */
+.cloudst{font-size:12px}.cloudst.ok{color:#0E7A55}.cloudst.sync{color:var(--blue)}.cloudst.err{color:var(--red)}.cloudst.off{color:var(--ink3)}
+.cloud-f{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.cloud-f label{display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.04em}
+.cloud-f input{border:1px solid var(--line2);border-radius:10px;padding:9px 11px;font-size:13px;outline:none;text-transform:none;letter-spacing:0;font-weight:400;color:var(--ink)}
+.cloud-f input:focus{border-color:var(--ink)}
+@media (max-width:700px){.cloud-f{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -961,7 +968,8 @@ mark.empty{font-style:italic;font-weight:400}
     <div class="side-foot">
       <div class="row"><span class="dot" id="dotPend"></span><span id="footPend">Pendências: nunca atualizadas</span></div>
       <div class="row"><span class="dot ok"></span><span id="footSave">Salvo neste navegador</span></div>
-      <div class="row" style="opacity:.6;font-size:11px"><span>Versão 16/10/2026 · v15</span></div>
+      <div class="row"><span class="cloudst off" id="footCloud" style="cursor:pointer">☁ Nuvem: não conectada</span></div>
+      <div class="row" style="opacity:.6;font-size:11px"><span>Versão 21/10/2026 · v16</span></div>
     </div>
   </aside>
 
@@ -1348,6 +1356,7 @@ mark.empty{font-style:italic;font-weight:400}
     <!-- ===== CONFIG ===== -->
     <section class="view" data-view="config">
       <div class="grid">
+        <div class="card c12" id="cloudCard"></div>
         <div class="card c6">
           <div class="card-h"><h3>Backup</h3></div>
           <p class="sub2" style="font-size:13px">Tudo fica salvo neste navegador. Baixe um backup antes de trocar de computador ou limpar o navegador.</p>
@@ -1364,7 +1373,7 @@ mark.empty{font-style:italic;font-weight:400}
         </div>
         <div class="card c6">
           <div class="card-h"><h3>Atalhos</h3></div>
-          <div class="sub2" style="font-size:13px;line-height:2">/ buscar · G visão geral · M mapa · O ordens · P programação · D controle diário · C colaboradores · U upload · E exportar · Esc fechar · ← → navegar entre OS no painel</div>
+          <div class="sub2" style="font-size:13px;line-height:2">/ buscar · G visão geral · M mapa · O ordens · P programação · C colaboradores · U upload · E exportar · Esc fechar · ← → navegar entre OS no painel</div>
         </div>
         <div class="card c6">
           <div class="card-h"><h3>Armazenamento</h3></div>
@@ -5276,6 +5285,209 @@ document.addEventListener('click', e => { const b = e.target.closest('[data-base
 </script>
 <script>
 /* =====================================================================
+   NUVEM (Supabase) — sincroniza o painel entre computadores + backups
+   Tabelas: painel_estado (user_id, chave, dados, hash, dispositivo) · painel_backup
+   O painel continua salvando no navegador; a nuvem é sincronizada em segundo plano.
+   ===================================================================== */
+let CLOUD = {url:'', key:'', email:'', sess:null, dev:'', hashes:{}, last:0, lastBackupDay:'', err:'', busy:false};
+const cloudOn = () => !!(CLOUD.url && CLOUD.key && CLOUD.sess?.access_token);
+function fnv(str){ let h = 0x811c9dc5; for(let i = 0; i < str.length; i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); } return (h >>> 0).toString(16) + '.' + str.length.toString(36); }
+function cleanState(){
+  const clean = {...S, rows:{}, imports:(S.imports || []).slice(-80)};
+  for(const [k, r] of Object.entries(S.rows || {})){ const {_st, _mt, _src, _dt, _tipo, ...rest} = r; clean.rows[k] = rest; }
+  return clean;
+}
+function localSections(){ const c = cleanState(), out = {}; for(const [k, v] of Object.entries(c)){ if(v === undefined) continue; const j = JSON.stringify(v); out[k] = {dados:v, json:j, hash:fnv(j)}; } return out; }
+async function cloudPersist(){ try{ await DB.set('cloud', {...CLOUD, busy:false}); }catch(e){} }
+
+/* ---------- HTTP ---------- */
+async function sbAuth(path, body){
+  const r = await fetch(`${CLOUD.url}/auth/v1/${path}`, {method:'POST', headers:{'apikey':CLOUD.key, 'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  const j = await r.json().catch(() => ({}));
+  if(!r.ok) throw new Error(j.error_description || j.msg || j.message || `Erro ${r.status} no login`);
+  return j;
+}
+function setSess(j){ CLOUD.sess = {access_token:j.access_token, refresh_token:j.refresh_token, expires_at:j.expires_at || (Math.floor(Date.now() / 1000) + (j.expires_in || 3600)), uid:j.user?.id || CLOUD.sess?.uid, email:j.user?.email || CLOUD.email}; }
+async function sbToken(){
+  if(!CLOUD.sess) throw new Error('Faça login na nuvem');
+  if(CLOUD.sess.expires_at - Date.now() / 1000 < 90){
+    try{ setSess(await sbAuth('token?grant_type=refresh_token', {refresh_token:CLOUD.sess.refresh_token})); await cloudPersist(); }
+    catch(e){ CLOUD.sess = null; await cloudPersist(); throw new Error('Sessão expirada — entre de novo'); }
+  }
+  return CLOUD.sess.access_token;
+}
+async function sb(path, opt = {}){
+  const tok = await sbToken();
+  const r = await fetch(`${CLOUD.url}/rest/v1/${path}`, {method:opt.method || 'GET', headers:{'apikey':CLOUD.key, 'Authorization':'Bearer ' + tok, 'Content-Type':'application/json', ...(opt.prefer ? {'Prefer':opt.prefer} : {})}, body:opt.body !== undefined ? (typeof opt.body === 'string' ? opt.body : JSON.stringify(opt.body)) : undefined});
+  if(r.status === 401 && !opt.retried){ CLOUD.sess.expires_at = 0; return sb(path, {...opt, retried:true}); }
+  if(!r.ok){ const t = await r.text(); let m = t; try{ const j = JSON.parse(t); m = j.message || j.hint || t; }catch(e){} if(/painel_estado|painel_backup/.test(m) && /does not exist|not find/.test(m)) m = 'Tabelas não encontradas — rode o SQL do painel no Supabase'; throw new Error(m.slice(0, 160)); }
+  if(r.status === 204 || opt.prefer?.includes('return=minimal')) return null;
+  return r.json();
+}
+
+/* ---------- sincronização por seção ---------- */
+function applyRemote(map){
+  for(const [k, v] of Object.entries(map)){ S[k] = v; }
+  S.weeks ||= {}; S.imports ||= []; S.people ||= {}; S.teams ||= {}; S.sent ||= {}; S.ctrl ||= {}; S.addr ||= {}; S.rows ||= {};
+  if('rows' in map) rowsArr().forEach(refresh);
+  const ws = weeksSorted(); if(!ws.includes(UI.week)) UI.week = ws.length ? ws[ws.length - 1] : '';
+}
+async function pushSections(secs, keys){
+  // envia em lotes (~3 MB) para não estourar o limite da API
+  let batch = [], size = 0;
+  const flush = async () => { if(!batch.length) return; await sb('painel_estado?on_conflict=user_id,chave', {method:'POST', prefer:'resolution=merge-duplicates,return=minimal', body:'[' + batch.join(',') + ']'}); batch = []; size = 0; };
+  for(const k of keys){
+    const s = secs[k], item = `{"user_id":${JSON.stringify(CLOUD.sess.uid)},"chave":${JSON.stringify(k)},"hash":${JSON.stringify(s.hash)},"dispositivo":${JSON.stringify(CLOUD.dev)},"dados":${s.json}}`;
+    if(size + item.length > 3e6) await flush();
+    batch.push(item); size += item.length;
+  }
+  await flush();
+  keys.forEach(k => CLOUD.hashes[k] = secs[k].hash);
+}
+async function cloudSync(opt = {}){
+  if(!cloudOn() || CLOUD.busy) return;
+  if(!navigator.onLine){ cloudStatus('offline'); return; }
+  CLOUD.busy = true; cloudStatus('sync');
+  try{
+    const remote = await sb('painel_estado?select=chave,hash,atualizado_em,dispositivo');
+    const R = {}; remote.forEach(x => R[x.chave] = x);
+    const L = localSections(), first = !Object.keys(CLOUD.hashes).length;
+    const keys = new Set([...Object.keys(L), ...Object.keys(R)]);
+    let pull = [], push = [], conflict = [], delRemote = [];
+    for(const k of keys){
+      const base = CLOUD.hashes[k], lh = L[k]?.hash, rh = R[k]?.hash;
+      if(lh === rh){ if(lh) CLOUD.hashes[k] = lh; continue; }
+      const lChanged = lh !== base, rChanged = rh !== base;
+      if(!R[k]){ if(base && !lChanged){ /* apagado na nuvem por outro computador */ delete S[k]; delete CLOUD.hashes[k]; } else push.push(k); continue; }
+      if(!L[k]){ if(base && !rChanged) delRemote.push(k); else pull.push(k); continue; }
+      if(rChanged && !lChanged) pull.push(k); else if(lChanged && !rChanged) push.push(k); else conflict.push(k);
+    }
+    // primeira conexão deste computador
+    if(first && remote.length){
+      const localHas = Object.keys(S.rows || {}).length, remoteRows = await sb('painel_estado?select=dados&chave=eq.rows');
+      const remoteHas = Object.keys(remoteRows?.[0]?.dados || {}).length;
+      if(!localHas){ pull = [...new Set([...pull, ...conflict, ...push.filter(k => R[k])])]; conflict = []; push = push.filter(k => !R[k]); }
+      else if(conflict.length || push.some(k => R[k])){
+        const dec = await cloudChoose({localN:localHas, remoteN:remoteHas, remoteAt:Math.max(...remote.map(x => +new Date(x.atualizado_em)))});
+        if(dec === 'nuvem'){ pull = [...new Set([...pull, ...conflict, ...push.filter(k => R[k])])]; push = push.filter(k => !R[k]); delRemote = []; }
+        else if(dec === 'local'){ push = [...new Set([...push, ...conflict, ...pull])]; pull = []; }
+        else { CLOUD.busy = false; cloudStatus('idle'); return; }
+        conflict = [];
+      }
+    }
+    if(conflict.length){
+      const dec = await cloudChoose({conflict, remoteAt:Math.max(...conflict.map(k => +new Date(R[k].atualizado_em))), dev:R[conflict[0]].dispositivo});
+      if(dec === 'nuvem') pull.push(...conflict); else if(dec === 'local') push.push(...conflict); else { CLOUD.busy = false; cloudStatus('idle'); return; }
+    }
+    if(pull.length){
+      const got = await sb(`painel_estado?select=chave,dados,hash&chave=in.(${pull.map(encodeURIComponent).join(',')})`);
+      const map = {}; got.forEach(x => { map[x.chave] = x.dados; CLOUD.hashes[x.chave] = x.hash; });
+      applyRemote(map);
+      try{ await DB.set('state', cleanState()); }catch(e){}
+      renderAll(); if(!opt.quiet) toast(`☁ Dados atualizados da nuvem (${pull.length} ${pull.length === 1 ? 'parte' : 'partes'})`);
+    }
+    if(push.length) await pushSections(localSections(), push);
+    if(delRemote.length){ await sb(`painel_estado?chave=in.(${delRemote.map(encodeURIComponent).join(',')})`, {method:'DELETE', prefer:'return=minimal'}); delRemote.forEach(k => delete CLOUD.hashes[k]); }
+    // backup diário
+    const day = todayISO();
+    if(CLOUD.lastBackupDay !== day && Object.keys(S.rows || {}).length){ await cloudBackup('diário', true); CLOUD.lastBackupDay = day; }
+    CLOUD.last = Date.now(); CLOUD.err = ''; await cloudPersist(); cloudStatus('ok');
+  }catch(e){ CLOUD.err = e.message || String(e); cloudStatus('err'); }
+  finally{ CLOUD.busy = false; if($('cloudCard') && UI.view === 'config') renderCloudCard(); }
+}
+function cloudChoose(o){
+  return new Promise(res => {
+    openModal(`<h3>☁ ${o.conflict ? 'Os dados mudaram nos dois lugares' : 'Já existem dados na nuvem'}</h3>
+      <div class="msub">${o.conflict ? `A nuvem foi atualizada ${o.dev && o.dev !== CLOUD.dev ? 'por outro computador ' : ''}em ${fmtDT(o.remoteAt)} e este computador também tem alterações ainda não enviadas (${o.conflict.length} ${o.conflict.length === 1 ? 'parte' : 'partes'}: ${o.conflict.join(', ')}).` : `A nuvem tem <b>${o.remoteN} OS</b> (atualizada em ${fmtDT(o.remoteAt)}) e este computador tem <b>${o.localN} OS</b>. Qual versão vale?`}</div>
+      <div class="cl-list"><label class="cl-it"><input type="radio" name="cc" value="nuvem" checked><div><b>Usar os dados da nuvem</b><span>Este computador fica igual à nuvem.</span></div><em>☁</em></label>
+      <label class="cl-it"><input type="radio" name="cc" value="local"><div><b>Manter os deste computador</b><span>A nuvem é substituída pelos dados daqui (um backup da nuvem é guardado antes).</span></div><em>💻</em></label></div>
+      <div class="mfoot"><button class="btn soft" id="mCancel">Decidir depois</button><button class="btn dark" id="mOk">Confirmar</button></div>`);
+    UI.onModalClose = () => res(null);
+    $('mCancel').onclick = closeModal;
+    $('mOk').onclick = async () => { const v = document.querySelector('input[name=cc]:checked').value; UI.onModalClose = null; closeModal();
+      if(v === 'local'){ try{ const all = await sb('painel_estado?select=chave,dados'); const d = {}; all.forEach(x => d[x.chave] = x.dados); await sb('painel_backup', {method:'POST', prefer:'return=minimal', body:{motivo:'antes de substituir pela versão de outro computador', os_qtd:Object.keys(d.rows || {}).length, tamanho_kb:Math.round(JSON.stringify(d).length / 1024), dados:d}}); }catch(e){} }
+      res(v); };
+  });
+}
+async function cloudBackup(motivo, quiet){
+  const c = cleanState(), j = JSON.stringify(c);
+  await sb('painel_backup', {method:'POST', prefer:'return=minimal', body:`{"motivo":${JSON.stringify(motivo)},"os_qtd":${Object.keys(c.rows).length},"tamanho_kb":${Math.round(j.length / 1024)},"dados":${j}}`});
+  if(!quiet) toast('☁ Backup criado na nuvem');
+}
+async function openCloudBackups(){
+  let list = [];
+  try{ list = await sb('painel_backup?select=id,criado_em,motivo,os_qtd,tamanho_kb&order=criado_em.desc&limit=20'); }catch(e){ toast(e.message); return; }
+  openModal(`<h3>☁ Backups na nuvem</h3><div class="msub">Guardamos um por dia automaticamente (os 20 mais recentes). Restaurar substitui os dados do painel neste computador e na nuvem.</div>
+    <div class="cl-list" id="cbList">${list.length ? list.map(b => `<div class="cl-it" style="cursor:default"><span style="font-size:18px">🗂</span><div><b>${fmtDT(b.criado_em)} · ${esc(b.motivo || '')}</b><span>${b.os_qtd ?? '?'} OS · ${b.tamanho_kb ?? '?'} KB</span></div><button class="btn sm ghost" data-cbr="${b.id}">Restaurar</button></div>`).join('') : '<div class="empty" style="padding:20px">Nenhum backup ainda.</div>'}</div>
+    <div class="mfoot"><button class="btn ghost" id="cbNew" style="margin-right:auto">Criar backup agora</button><button class="btn soft" id="mCancel">Fechar</button></div>`);
+  $('mCancel').onclick = closeModal;
+  $('cbNew').onclick = async () => { try{ await cloudBackup('manual'); closeModal(); openCloudBackups(); }catch(e){ toast(e.message); } };
+  $('cbList').onclick = async e => { const b = e.target.closest('[data-cbr]'); if(!b) return;
+    if(!confirm('Restaurar este backup? Os dados atuais do painel serão substituídos (um backup deles é criado antes).')) return;
+    try{ await cloudBackup('antes de restaurar', true); const [x] = await sb(`painel_backup?select=dados&id=eq.${b.dataset.cbr}`); const {v, ...rest} = x.dados;
+      S = {weeks:{}, imports:[], people:{}, teams:{}, sent:{}, ctrl:{}, addr:{}, ...rest}; migrateManual(); rowsArr().forEach(refresh); closeModal(); save(); renderAll(); toast('Backup restaurado'); }
+    catch(err){ toast(err.message); } };
+}
+
+/* ---------- status e tela de configuração ---------- */
+function cloudStatus(st){
+  const el = $('footCloud'); if(!el) return;
+  const t = CLOUD.last ? new Date(CLOUD.last).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) : '';
+  const m = !cloudOn() ? ['off', CLOUD.url ? 'Nuvem: entre de novo' : 'Nuvem: não conectada'] : st === 'sync' ? ['sync', 'Nuvem: sincronizando…'] : st === 'err' ? ['err', 'Nuvem: ' + (CLOUD.err || 'erro').slice(0, 40)] : st === 'offline' ? ['err', 'Nuvem: sem internet'] : ['ok', `Nuvem: sincronizado ${t}`];
+  el.className = 'cloudst ' + m[0]; el.textContent = '☁ ' + m[1]; el.title = CLOUD.err || '';
+}
+function renderCloudCard(){
+  const c = $('cloudCard'); if(!c) return;
+  if(cloudOn()){
+    c.innerHTML = `<div class="card-h"><h3>☁ Nuvem (Supabase)</h3><span class="badge" style="background:#E3F6EE;color:#0E7A55;margin-left:8px">conectado</span></div>
+      <div class="sub2" style="font-size:13px;line-height:1.8">Conta: <b>${esc(CLOUD.sess.email || CLOUD.email)}</b><br>Projeto: ${esc(CLOUD.url.replace(/^https?:\/\//, ''))}<br>Última sincronização: <b>${CLOUD.last ? fmtDT(CLOUD.last) : '—'}</b>${CLOUD.err ? `<br><span style="color:var(--red)">⚠ ${esc(CLOUD.err)}</span>` : ''}<br>Tudo que você muda é enviado sozinho em poucos segundos; ao abrir em outro computador, ele baixa o que mudou.</div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn dark sm" id="cSync">Sincronizar agora</button><button class="btn ghost sm" id="cBk">Backups na nuvem</button><button class="btn soft sm" id="cOut">Sair</button></div>`;
+    $('cSync').onclick = () => cloudSync(); $('cBk').onclick = openCloudBackups;
+    $('cOut').onclick = async () => { if(!confirm('Desconectar este computador da nuvem? Os dados continuam aqui e na nuvem.')) return; try{ await fetch(`${CLOUD.url}/auth/v1/logout`, {method:'POST', headers:{apikey:CLOUD.key, Authorization:'Bearer ' + CLOUD.sess.access_token}}); }catch(e){} CLOUD.sess = null; CLOUD.hashes = {}; await cloudPersist(); renderCloudCard(); cloudStatus(); };
+  } else {
+    c.innerHTML = `<div class="card-h"><h3>☁ Nuvem (Supabase)</h3></div>
+      <div class="sub2" style="font-size:13px">Conecte para ter os dados salvos na nuvem e abrir o painel em qualquer computador. Antes, rode o arquivo <b>supabase_top40.sql</b> no SQL Editor do seu projeto e crie o seu usuário em Authentication → Users.</div>
+      <div class="cloud-f">
+        <label>URL do projeto<input id="cUrl" placeholder="https://xxxx.supabase.co" value="${esc(CLOUD.url)}"></label>
+        <label>Chave anon (public)<input id="cKey" placeholder="eyJhbGciOi…" value="${esc(CLOUD.key)}"></label>
+        <label>E-mail<input id="cMail" type="email" value="${esc(CLOUD.email)}"></label>
+        <label>Senha<input id="cPass" type="password"></label>
+      </div>
+      <div class="fl-hint" id="cErr">${esc(CLOUD.err || '')}</div>
+      <div style="display:flex;gap:8px;margin-top:6px"><button class="btn blue sm" id="cIn">Conectar</button></div>
+      <div class="sub2" style="margin-top:8px">A URL e a chave anon ficam em Supabase → Project Settings → API. A chave anon é pública: sem o seu login ela não acessa nada.</div>`;
+    $('cIn').onclick = async () => {
+      const url = $('cUrl').value.trim().replace(/\/+$/, ''), key = $('cKey').value.trim(), email = $('cMail').value.trim(), pass = $('cPass').value;
+      if(!/^https:\/\/.+/.test(url) || !key || !email || !pass){ $('cErr').textContent = 'Preencha URL, chave, e-mail e senha.'; return; }
+      $('cIn').disabled = true; $('cIn').textContent = 'Conectando…';
+      try{
+        if(CLOUD.url && CLOUD.url !== url) CLOUD.hashes = {};
+        Object.assign(CLOUD, {url, key, email}); setSess(await sbAuth('token?grant_type=password', {email, password:pass}));
+        CLOUD.err = ''; await cloudPersist(); renderCloudCard(); toast('☁ Conectado — sincronizando…'); await cloudSync();
+      }catch(e){ $('cErr').textContent = /fetch/i.test(e.message) ? 'Não foi possível falar com o Supabase — confira a URL e a internet.' : (/Invalid login/i.test(e.message) ? 'E-mail ou senha incorretos.' : e.message); $('cIn').disabled = false; $('cIn').textContent = 'Conectar'; }
+    };
+  }
+}
+
+/* ---------- ganchos ---------- */
+let cloudT = null;
+const _saveCloud = save;
+save = function(){ _saveCloud(); if(!cloudOn()) return; clearTimeout(cloudT); cloudT = setTimeout(() => cloudSync({quiet:true}), 4000); };
+const _rAllCloud = renderAll;
+renderAll = function(){ _rAllCloud(); if(UI.view === 'config') renderCloudCard(); };
+async function cloudBoot(){
+  try{ const c = await DB.get('cloud'); if(c) CLOUD = {...CLOUD, ...c, busy:false}; }catch(e){}
+  if(!CLOUD.dev) { CLOUD.dev = (navigator.platform || 'pc').slice(0, 12) + '-' + Math.random().toString(36).slice(2, 7); cloudPersist(); }
+  cloudStatus(cloudOn() ? 'ok' : 'off');
+  if(cloudOn()) cloudSync();
+  setInterval(() => { if(cloudOn() && document.visibilityState === 'visible') cloudSync({quiet:true}); }, 180000);
+  addEventListener('focus', () => { if(cloudOn() && Date.now() - CLOUD.last > 30000) cloudSync(); });
+  addEventListener('online', () => cloudOn() && cloudSync());
+}
+$('footCloud')?.addEventListener('click', () => setView('config'));
+</script>
+<script>
+/* =====================================================================
    EXPORTAÇÃO EXCEL (formatada)
    ===================================================================== */
 function openExport(){
@@ -5518,6 +5730,7 @@ function sheetResumo(B, list, sub){
   COORDS = (await DB.get('coords')) || {};
   const ws = weeksSorted(); UI.week = ws.length ? ws[ws.length-1] : '';
   renderAll();
+  if(typeof cloudBoot === 'function') cloudBoot();
 })();
 </script>
 </body>
