@@ -944,6 +944,18 @@ mark.empty{font-style:italic;font-weight:400}
 .dr-del{padding:6px 0 18px;text-align:center}
 .dr-del .btn{background:none;color:#D23439;border:1px dashed #F3B4B6}
 .dr-del .btn:hover{background:#FFF1F1}
+.arrseg{background:var(--soft);margin:2px 0 6px;width:100%}.arrseg button{flex:1;padding:5px 4px;font-size:12px;white-space:nowrap}.arrseg .n{font-size:10.5px;color:var(--ink3);margin-left:3px}
+/* ===== nº da OS alterado / reprogramar ===== */
+.osman{background:#FFF1C7;color:#7A4B00;border-radius:6px;padding:0 5px;box-shadow:inset 0 0 0 1.5px #F5C542;font-weight:700}
+.osman::after{content:' ✎';font-size:.8em;opacity:.7}
+.rpm{display:inline-grid;place-items:center;width:17px;height:17px;border-radius:50%;background:var(--blue);color:#fff;font-size:10px;font-weight:700;margin-left:4px;vertical-align:1px}
+.cnt.rpc{background:#EEF3FF;color:var(--blue)}
+.os-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.osant{margin-top:8px;background:#FFF8E6;border:1px solid #F5D98A;border-radius:12px;padding:8px 12px;font-size:12.5px;color:#7A4B00;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center}
+.osant span{color:#9A7A3A;font-size:11.5px}
+.rp-card .acts{align-items:center}
+.rp-sel,.rp-date{border:1px solid var(--line2);border-radius:999px;padding:6px 10px;font-size:12.5px;background:#fff;outline:none}
+.rp-sel{max-width:170px}
 </style>
 </head>
 <body>
@@ -965,6 +977,7 @@ mark.empty{font-style:italic;font-weight:400}
       <button class="nav-item" data-view="localizacao"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.5"/></svg>Localização<span class="cnt" id="navLoc"></span></button>
       <button class="nav-item" data-view="ordens" data-status=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>Ordens<span class="cnt" id="navAll"></span></button>
       <div class="nav-sub" id="navSub"></div>
+      <button class="nav-item" data-view="reprogramar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/></svg>Reprogramar<span class="cnt rpc" id="navRep"></span></button>
       <button class="nav-item" data-view="sinalizadas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/></svg>Sinalizadas<span class="cnt flagc" id="navFlag"></span></button>
       <button class="nav-item" data-view="programacao"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8 2v4M16 2v4M3 10h18M8 14h3M8 17h6"/></svg>Programação<span class="cnt" id="navProg"></span></button>
       <button class="nav-item" data-view="controle" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1Z"/><path d="M8 6H6a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-2"/><path d="m9 13 2 2 4-4"/></svg>Controle diário<span class="cnt" id="navCtrl"></span></button>
@@ -978,7 +991,7 @@ mark.empty{font-style:italic;font-weight:400}
       <div class="row"><span class="dot" id="dotPend"></span><span id="footPend">Pendências: nunca atualizadas</span></div>
       <div class="row"><span class="dot ok"></span><span id="footSave">Salvo neste navegador</span></div>
       <div class="row"><span class="cloudst off" id="footCloud" style="cursor:pointer">☁ Nuvem: não conectada</span></div>
-      <div class="row" style="opacity:.6;font-size:11px"><span>Versão 23/10/2026 · v17</span></div>
+      <div class="row" style="opacity:.6;font-size:11px"><span>Versão 23/10/2026 · v18</span></div>
     </div>
   </aside>
 
@@ -1045,6 +1058,7 @@ mark.empty{font-style:italic;font-weight:400}
         </div>
         <div class="card c3">
           <div class="card-h"><h3>Valor arrecadado</h3></div>
+          <div class="seg arrseg" id="arrMode"><button data-am="" class="on">Total</button><button data-am="sis">Sistema</button><button data-am="man">Manual</button></div>
           <div class="big num" id="kRec">R$ 0</div>
           <div class="subline"><span class="badge dark" id="kRecBadge">—</span><span id="kRecSub">acumulado no período</span></div>
           <div class="linewrap" id="lineChart"></div>
@@ -1102,6 +1116,22 @@ mark.empty{font-style:italic;font-weight:400}
         <div class="card c5"><div class="card-h"><h3>Motivos de não execução</h3></div><div id="cmpMot"></div></div>
         <div class="card c12"><div class="card-h"><h3>Por dupla</h3><span class="sub2" style="margin-left:auto">OS programadas para cada equipe</span></div><div style="overflow:auto"><table class="mini cmp-t" id="cmpTeam"></table></div></div>
       </div>
+    </section>
+
+    <!-- ===== REPROGRAMAR ===== -->
+    <section class="view" data-view="reprogramar">
+      <div class="prog-top">
+        <div class="seg" id="rTab"><button data-rt="abertas" class="on">Para ir à rua<span class="n" id="rNOpen"></span></button><button data-rt="feitas">Já reprogramadas<span class="n" id="rNDone"></span></button></div>
+        <span class="sub2" id="rSummary"></span>
+        <div class="spacer"></div>
+        <button class="btn ghost sm" id="rCopy">⧉ Copiar OS</button>
+        <button class="btn blue sm" id="rGoProg">Abrir na Programação</button>
+      </div>
+      <div class="fl-tools">
+        <input id="rQ" placeholder="Filtrar por OS, titular, endereço, observação…" autocomplete="off">
+        <select id="rSort"><option value="old">Liberadas há mais tempo</option><option value="new">Mais recentes</option><option value="deb">Maior débito</option></select>
+      </div>
+      <div class="fl-grid" id="rList"></div>
     </section>
 
     <!-- ===== SINALIZADAS ===== -->
@@ -1193,6 +1223,7 @@ mark.empty{font-style:italic;font-weight:400}
         <select id="bulkSt" style="display:none"></select>
         <select id="bulkUni"></select>
         <button class="btn sm" id="bulkFlag" style="background:#FFF1F1;color:#D23439"><svg width="14" height="14" style="vertical-align:-2px;margin-right:4px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/></svg>Sinalizar</button>
+        <button class="btn sm" id="bulkRep" style="background:#EEF3FF;color:var(--blue)">↻ Reprogramar</button>
         <button class="btn sm" id="bulkArr" style="background:#E3F6EE;color:#0E7A55">$ Arrecadação</button>
         <button class="btn sm" id="bulkDel" style="background:transparent;color:#F3A1A3">Excluir</button>
         <div class="spacer"></div>
@@ -1909,7 +1940,8 @@ function parseSheets(sheets, fileName){
   const {sh, i, keys} = best, recs = [];
   for(const line of sh.rows.slice(i+1)){
     const m = {}; keys.forEach((k,j)=>{ if(k && m[k] === undefined) m[k] = line[j]; });
-    const os = normOS(toId(m.os)); if(!os || !/\d{5,}/.test(os)) continue;
+    const os0 = normOS(toId(m.os)); if(!os0 || !/\d{5,}/.test(os0)) continue;
+    const os = (S.osAlias && S.osAlias[os0]) || os0;  // OS com número alterado à mão: a planilha ainda traz o antigo
     const s = v => { const t = fixText(v); return t === null || t === undefined ? '' : String(t).trim(); };
     recs.push({os, forn:toId(m.forn), titular:s(m.titular), regional:s(m.regional).toUpperCase(), municipio:s(m.municipio).toUpperCase(), setor:toId(m.setor), atc:toId(m.atc),
       cdTss:toId(m.cdTss), tipoCorte:s(m.tipoCorte).toUpperCase(), servico:s(m.servico), contrato:s(m.contrato), dtGer:toISO(m.dtGer), stForn:s(m.stForn), segmento:s(m.segmento),
@@ -2388,7 +2420,7 @@ function rowHtml(r){
   return `<tr data-os="${r.os}" class="${UI.sel.has(r.os)?'sel':''} ${DR===r.os?'cur':''} ${r.flag && !r.flag.done ? 'flagged' : ''}">
     <td class="ck"><input type="checkbox" data-f="sel" ${UI.sel.has(r.os)?'checked':''}></td>
     <td>${stPill(r)}${ctrlBadge(r.os) ? `<div style="margin-top:4px">${ctrlBadge(r.os)}</div>` : ''}</td>
-    <td><span class="osn">${osD(r.os)}</span><button class="copy" data-copy="${osD(r.os)}" title="Copiar OS">⧉</button>${typeof flagBtn === 'function' ? flagBtn(r) : ''}<div class="sub2">Forn. <span style="user-select:all">${esc(r.forn)}</span><button class="copy" data-copy="${esc(r.forn)}" title="Copiar fornecimento">⧉</button></div></td>
+    <td><span class="osn ${r.osAnt?.length ? 'osman' : ''}" ${r.osAnt?.length ? `title="Número alterado à mão · antes: ${r.osAnt.map(osD).join(', ')}"` : ''}>${osD(r.os)}</span><button class="copy" data-copy="${osD(r.os)}" title="Copiar OS">⧉</button>${typeof flagBtn === 'function' ? flagBtn(r) : ''}<div class="sub2">Forn. <span style="user-select:all">${esc(r.forn)}</span><button class="copy" data-copy="${esc(r.forn)}" title="Copiar fornecimento">⧉</button></div></td>
     <td class="cli"><span class="tit" title="${esc(r.titular)}">${esc(r.titular||'—')}</span><div class="sub2 tit" title="${esc(a ? addrLine(a) : '')}">${a?.end ? esc(addrShort(a)) : esc(titleCase(r.municipio))}</div></td>
     <td><span style="font-weight:500">${esc(regName(r.regional))}</span><div class="sub2">${L?.unidade ? `<span class="ub" title="${esc(L.unidade)}">${esc(uniAbbr(L.unidade))}</span>${L.setor?' · Setor '+esc(L.setor):''}` : esc(titleCase(r.municipio))}${ar?.area ? ` · <span class="ar" style="--c:${AREA_COLOR[ar.area]}">${esc(ar.area)}</span>` : ''}</div></td>
     <td class="num"><b style="font-weight:600">${brl(r.debTotal)}</b><div style="margin-top:3px">${tipoTag(r)}</div></td>
@@ -2848,7 +2880,7 @@ function ocHtml(r, inCol, n, sug){
   const loc = [L?.unidade ? `<span class="ub" title="${esc(L.unidade)}">${esc(uniAbbr(L.unidade))}</span>` : '', L?.setor ? `Setor ${esc(L.setor)}` : '', ar ? areaChip(ar.area) : ''].filter(Boolean).join(' ');
   return `<div class="oc ${!inCol && UI.psel.has(r.os)?'sel':''}" draggable="true" data-os="${r.os}">
     ${inCol ? `<span class="n">${n}</span>` : `<input type="checkbox" ${UI.psel.has(r.os)?'checked':''}>`}
-    <span class="o"><span class="d" style="background:${s.c}" title="${s.l}"></span>${osD(r.os)}<button class="copy occ" data-ocopy="${osD(r.os)}" title="Copiar OS">⧉</button>${flag}${r.flag && !r.flag.done && typeof flagMini === 'function' ? flagMini(r) : ''}</span>
+    <span class="o"><span class="d" style="background:${s.c}" title="${s.l}"></span><span class="${r.osAnt?.length ? 'osman' : ''}">${osD(r.os)}</span>${r.reprog && !r.reprog.done ? '<span class="rpm" title="Liberada para ir à rua de novo">↻</span>' : ''}<button class="copy occ" data-ocopy="${osD(r.os)}" title="Copiar OS">⧉</button>${flag}${r.flag && !r.flag.done && typeof flagMini === 'function' ? flagMini(r) : ''}</span>
     <span class="dv">${brlK(r.debTotal)}${inCol?` <button class="x" title="Tirar da programação">✕</button>`:''}</span>
     <span class="m" title="${esc(r.titular)}${a?.end?' — '+esc(addrLine(a)):''}">${esc(r.titular||'—')} · ${a?.end ? esc(addrShort(a)) : esc(titleCase(r.municipio))}${r._tipo==='supressao'?' · Supressão':''}</span>
     ${inCol && r.prog ? (() => { const own = r.prog.pda && pdaById(r.prog.pda) ? r.prog.pda : '', eff = own || pdaOf(r.prog.data, r.prog.alvo); return `<span class="lc"><button type="button" class="pdac ${own?'own':''} ${eff?'':'miss'}" data-pdapick="${r.os}" title="Clique para trocar o PDA desta OS (${own?'PDA próprio':'PDA da equipe'})">PDA · ${eff ? esc(pdasArr().find(x=>x.id===eff)?.nome||'') : 'definir'} ▾</button>${loc}</span>`; })() : ''}
@@ -2870,9 +2902,9 @@ function renderProg(){
   document.querySelectorAll('#poolGroup button').forEach(b => b.classList.toggle('on', b.dataset.g === UI.pgroup));
   if(UI.puni) pool = pool.filter(r => UI.puni === '__none' ? !locOf(r)?.unidade : locOf(r)?.unidade === UI.puni);
   if(UI.parea) pool = pool.filter(r => UI.parea === '__none' ? !areaOf(r) : areaOf(r)?.area === UI.parea);
-  const cnt = {todas:pool.length, novas:pool.filter(r=>!r.prog).length, reprog:pool.filter(r=>r.prog && r.prog.data < d).length, nexec:pool.filter(r=>r._st==='nao_executada').length};
-  $('poolChips').innerHTML = [['todas','Todas'],['novas','Nunca programadas'],['reprog','Reprogramar'],['nexec','Não executadas']].map(([k,l]) => `<button class="chip ${UI.pchip===k?'on':''}" data-pc="${k}">${l}<span class="n">${cnt[k]}</span></button>`).join('');
-  if(UI.pchip==='novas') pool = pool.filter(r=>!r.prog); if(UI.pchip==='reprog') pool = pool.filter(r=>r.prog && r.prog.data < d); if(UI.pchip==='nexec') pool = pool.filter(r=>r._st==='nao_executada');
+  const cnt = {todas:pool.length, novas:pool.filter(r=>!r.prog).length, reprog:pool.filter(r=>r.prog && r.prog.data < d).length, liber:pool.filter(r=>r.reprog && !r.reprog.done).length, nexec:pool.filter(r=>r._st==='nao_executada').length};
+  $('poolChips').innerHTML = [['todas','Todas'],['liber','↻ Liberadas p/ rua'],['novas','Nunca programadas'],['reprog','Atrasadas'],['nexec','Não executadas']].map(([k,l]) => `<button class="chip ${UI.pchip===k?'on':''}" data-pc="${k}">${l}<span class="n">${cnt[k]}</span></button>`).join('');
+  if(UI.pchip==='novas') pool = pool.filter(r=>!r.prog); if(UI.pchip==='reprog') pool = pool.filter(r=>r.prog && r.prog.data < d); if(UI.pchip==='nexec') pool = pool.filter(r=>r._st==='nao_executada'); if(UI.pchip==='liber') pool = pool.filter(r=>r.reprog && !r.reprog.done);
   if(UI.pq) pool = pool.filter(r => matchQ(r, UI.pq));
   if(UI.q) pool = pool.filter(r => matchQ(r, UI.q));
   [...UI.psel].forEach(os => { if(!pool.some(r=>r.os===os)) UI.psel.delete(os); });
@@ -4426,7 +4458,7 @@ function renderDuoDetail(k, d){
     ${list.map((r, i) => { const L0 = locOf(r), ad = addrOf(r.os), own = r.prog.pda && pdaById(r.prog.pda), eff = pdaOfOS(r), leg = rt.legs[r.os], gc = isGc(r);
       return `<tr class="row ${gc ? 'gc' : ''}" data-os="${r.os}"><td class="n">${r.prog.ordem || i + 1}</td>
         <td><button class="gcchk sm ${gc ? 'on' : ''}" data-gcos="${r.os}" title="${gc ? 'Lançada no GeoCall ' + fmtDT(r.prog.gc || S.sent[d+'|'+k]) : 'Marcar como lançada no GeoCall'}">✓</button></td>
-        <td class="os"><span class="d" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${ST[r._st].c};margin-right:6px;vertical-align:1px" title="${ST[r._st].l}"></span>${osD(r.os)} <button class="copy occ" data-ocopy="${osD(r.os)}" title="Copiar OS">⧉</button></td>
+        <td class="os"><span class="d" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${ST[r._st].c};margin-right:6px;vertical-align:1px" title="${ST[r._st].l}"></span><span class="${r.osAnt?.length ? 'osman' : ''}">${osD(r.os)}</span> <button class="copy occ" data-ocopy="${osD(r.os)}" title="Copiar OS">⧉</button></td>
         <td class="tt"><div>${esc(r.titular || '—')}</div><small>${ad?.end ? esc(addrLine(ad)) : esc(titleCase(r.municipio)) + ' · <span style="color:#A26300">sem endereço</span>'}</small></td>
         <td>${L0?.unidade ? `<span class="ub" title="${esc(L0.unidade)}">${esc(uniAbbr(L0.unidade))}</span>${L0.setor ? ' <small style="color:var(--ink3)">Setor ' + esc(L0.setor) + '</small>' : ''}` : '<small style="color:var(--ink3)">—</small>'}</td>
         <td class="leg ${leg > FAR_KM ? 'far' : ''}">${leg != null ? (i === 0 && rt.base ? 'da base ' : '+') + kmFmt(leg) : (ptOf(r) ? 'início' : '—')}</td>
@@ -5657,9 +5689,196 @@ document.addEventListener('click', e => {
   const d = e.target.closest('[data-delos]'); if(d){ e.stopPropagation(); askDelete(d.dataset.delos); }
 }, true);
 
+/* Visão geral: valor arrecadado com alternância Total / Sistema / Manual */
+UI.arrMode = '';
+function renderArrCard(){
+  const R = scopeRows(), s = statOf(R), pg = R.filter(r => r._st === 'paga');
+  const sis = pg.filter(r => !r.arrMan), man = pg.filter(r => r.arrMan);
+  const L = UI.arrMode === 'sis' ? sis : UI.arrMode === 'man' ? man : pg, v = L.reduce((t, r) => t + arrVal(r), 0);
+  const vs = sis.reduce((t, r) => t + arrVal(r), 0), vm = man.reduce((t, r) => t + arrVal(r), 0);
+  document.querySelectorAll('#arrMode button').forEach(b => { b.classList.toggle('on', b.dataset.am === UI.arrMode); const n = b.dataset.am === 'sis' ? sis.length : b.dataset.am === 'man' ? man.length : pg.length; b.innerHTML = `${b.dataset.am === 'sis' ? 'Sistema' : b.dataset.am === 'man' ? 'Manual' : 'Total'} <span class="n">${n}</span>`; });
+  $('kRec').textContent = brl(v);
+  $('kRecBadge').textContent = `${pct(v, s.deb)}% do débito`;
+  $('kRecSub').innerHTML = UI.arrMode === 'man' ? `${man.length} OS registradas à mão` : UI.arrMode === 'sis' ? `${sis.length} OS pela planilha oficial (faturas / POS)` : `<span style="color:var(--ink2)">Sistema ${brlK(vs)}</span> · <span style="color:#0E7A55">Manual ${brlK(vm)}</span>`;
+  $('lineChart').innerHTML = lineSvg(L.filter(r => r._dt).sort((a, b) => a._dt.localeCompare(b._dt)));
+}
+$('arrMode').addEventListener('click', e => { const b = e.target.closest('[data-am]'); if(b){ UI.arrMode = b.dataset.am; renderArrCard(); } });
+const _rOvArr = renderOverview;
+renderOverview = function(){ _rOvArr(); if(scopeRows().length) try{ renderArrCard(); }catch(err){ console.error(err); } };
+
 /* lixeira em Configurações */
 const _rAllX = renderAll;
 renderAll = function(){ _rAllX(); if(UI.view === 'config' && $('storeInfo') && !$('lxBtn')) $('storeInfo').parentElement.insertAdjacentHTML('beforeend', `<div style="margin-top:8px"><button class="btn ghost sm" id="lxBtn">🗑 Lixeira (${(S.lixeira || []).length})</button></div>`); if($('lxBtn')){ $('lxBtn').textContent = `🗑 Lixeira (${(S.lixeira || []).length})`; $('lxBtn').onclick = openLixeira; } };
+</script>
+<script>
+/* =====================================================================
+   ALTERAR Nº DA OS (manual vira o principal; o antigo continua valendo nas planilhas)
+   REPROGRAMAR (liberar a OS para ir à rua de novo) + menu próprio
+   r.osAnt = ['antigo', ...] · S.osAlias = {antigo: novo} · r.reprog = {at, nota, done, doneAt, para}
+   ===================================================================== */
+
+/* ---------- alterar o número da OS ---------- */
+function renameOS(oldOs, newOs){
+  const r = S.rows[oldOs]; newOs = normOS(String(newOs).replace(/\D/g, ''));
+  if(!r || !newOs || newOs === oldOs) return false;
+  if(S.rows[newOs]){ toast(`A OS ${osD(newOs)} já está no painel`); return false; }
+  S.osAlias ||= {};
+  r.osAnt = [...new Set([...(r.osAnt || []), oldOs])].filter(x => x !== newOs);
+  r.os = newOs; S.rows[newOs] = r; delete S.rows[oldOs];
+  // tudo que apontava para o número antigo passa a apontar para o novo
+  Object.keys(S.osAlias).forEach(k => { if(S.osAlias[k] === oldOs) S.osAlias[k] = newOs; });
+  r.osAnt.forEach(a => S.osAlias[a] = newOs); delete S.osAlias[newOs];
+  const ko = k10(oldOs), kn = k10(newOs);
+  if(S.addr?.[ko] && !S.addr[kn]){ S.addr[kn] = {...S.addr[ko], osSis:newOs}; delete S.addr[ko]; }
+  Object.values(S.ctrl || {}).forEach(m => { if(m[oldOs]){ m[newOs] = m[oldOs]; delete m[oldOs]; } });
+  if(UI.sel?.has(oldOs)){ UI.sel.delete(oldOs); UI.sel.add(newOs); }
+  if(UI.list) UI.list = UI.list.map(x => x === oldOs ? newOs : x);
+  if(DR === oldOs) DR = newOs;
+  hist(r, `Número da OS alterado à mão: ${osD(oldOs)} → ${osD(newOs)} (as planilhas com o número antigo continuam atualizando esta OS)`);
+  refresh(r); save(); renderAll(); toast(`OS ${osD(oldOs)} agora é ${osD(newOs)}`);
+  return true;
+}
+function undoRename(os){
+  const r = S.rows[os]; const prev = r?.osAnt?.[r.osAnt.length - 1]; if(!prev) return;
+  if(S.rows[prev]){ toast('O número anterior já existe no painel'); return; }
+  r.osAnt = r.osAnt.slice(0, -1); delete S.osAlias[prev];
+  r.os = prev; S.rows[prev] = r; delete S.rows[os];
+  Object.keys(S.osAlias || {}).forEach(k => { if(S.osAlias[k] === os) S.osAlias[k] = prev; });
+  S.osAlias[os] = prev; // se alguma planilha trouxer o número que foi desfeito, cai na mesma OS
+  const ko = k10(os), kn = k10(prev); if(S.addr?.[ko] && !S.addr[kn]){ S.addr[kn] = {...S.addr[ko], osSis:prev}; delete S.addr[ko]; }
+  if(!r.osAnt.length) delete r.osAnt;
+  if(DR === os) DR = prev;
+  hist(r, `Número da OS voltou para ${osD(prev)}`); save(); renderAll(); toast(`OS voltou para ${osD(prev)}`);
+}
+function openRenameModal(os){
+  const r = S.rows[os]; if(!r) return;
+  openModal(`<h3>✎ Alterar número da OS</h3>
+    <div class="msub">${esc(r.titular || '')} · número atual <b>${osD(os)}</b>${r.osAnt?.length ? ` (original: ${r.osAnt.map(osD).join(', ')})` : ''}</div>
+    <div class="cloud-f" style="grid-template-columns:1fr"><label>Novo número da OS<input id="rnNew" inputmode="numeric" placeholder="Ex.: 2641709999" autocomplete="off"></label></div>
+    <div class="fl-hint" id="rnErr"></div>
+    <div class="sub2" style="margin-top:6px;line-height:1.6">• O número novo vira o principal e aparece <span class="osman">em destaque</span> em todo o painel.<br>• O número antigo fica guardado dentro da OS. Planilhas de atualização, lista ou endereços que ainda trouxerem o número antigo continuam atualizando esta mesma OS.<br>• Programação, sinalização, observações e endereço manual são mantidos.</div>
+    <div class="mfoot"><button class="btn soft" id="mCancel">Cancelar</button><button class="btn dark" id="mOk">Alterar número</button></div>`);
+  setTimeout(() => $('rnNew')?.focus(), 50);
+  $('mCancel').onclick = closeModal;
+  const go = () => { const v = $('rnNew').value.replace(/\D/g, ''); if(v.length < 6){ $('rnErr').textContent = 'Digite o número da OS (só números).'; return; }
+    if(S.rows[normOS(v)]){ $('rnErr').textContent = `A OS ${osD(normOS(v))} já está no painel.`; return; }
+    closeModal(); renameOS(os, v); };
+  $('mOk').onclick = go; $('rnNew').onkeydown = e => { if(e.key === 'Enter') go(); };
+}
+// busca também pelo número antigo
+const _matchQRen = matchQ;
+matchQ = function(r, q){ return _matchQRen(r, q) || (!!q && !!r.osAnt?.some(a => a.includes(String(q).replace(/\D/g, '')) && String(q).replace(/\D/g, '').length >= 4)); };
+
+/* ---------- reprogramar ---------- */
+const isRep = r => !!(r?.reprog && !r.reprog.done);
+function setReprog(oses, nota, concluirFlag){
+  const now = Date.now();
+  oses.forEach(os => { const r = S.rows[os]; if(!r) return;
+    r.reprog = {at:now, nota, done:false, de: r.prog ? {data:r.prog.data, alvo:r.prog.alvo} : null, st:r._st};
+    hist(r, `Liberada para reprogramar${nota ? ': ' + nota : ''}`);
+    if(concluirFlag && typeof isFlag === 'function' && isFlag(r)){ r.flag.done = true; r.flag.doneAt = now; hist(r, 'Sinalização concluída ao reprogramar'); } });
+  UI.sel?.clear(); save(); renderAll();
+  toast(oses.length === 1 ? `OS ${osD(oses[0])} liberada para ir à rua de novo` : `${oses.length} OS liberadas para reprogramar`);
+}
+function openRepModal(oses){
+  oses = [].concat(oses).filter(os => S.rows[os]); if(!oses.length) return;
+  const one = oses.length === 1, r = S.rows[oses[0]], cur = one && isRep(r) ? r.reprog : null;
+  const fl = oses.filter(os => typeof isFlag === 'function' && isFlag(S.rows[os])).length;
+  openModal(`<h3>↻ Reprogramar ${one ? 'OS ' + osD(oses[0]) : oses.length + ' OS'}</h3>
+    <div class="msub">${one ? esc(r.titular || '') + ' · ' + ST[r._st].l + (r._mt ? ' · ' + esc(r._mt) : '') + (r.prog ? ` · última programação ${fmtDs(r.prog.data)} (${esc(alvoNome(r.prog.alvo))})` : '') + '<br>' : ''}A OS vai para o menu <b>Reprogramar</b> e para o filtro <b>“Liberadas p/ rua”</b> da Programação. Sai de lá sozinha quando for programada de novo.</div>
+    <div class="sec-t" style="margin-top:14px">Observação para a equipe (opcional)</div>
+    <textarea id="rpNota" class="fl-txt" style="min-height:70px" placeholder="Ex.: cliente vai estar em casa à tarde; portão liberado; tentar com a vizinha do 12…">${esc(cur?.nota || '')}</textarea>
+    ${fl ? `<label class="pm-opt" style="margin-top:6px"><input type="checkbox" id="rpFlag" checked> Concluir a sinalização (${fl} ${fl === 1 ? 'OS sinalizada' : 'OS sinalizadas'})</label>` : ''}
+    <div class="mfoot">${cur ? '<button class="btn danger" id="rpDel" style="margin-right:auto">Tirar da lista</button>' : ''}<button class="btn soft" id="mCancel">Cancelar</button><button class="btn blue" id="mOk">↻ Liberar para reprogramar</button></div>`);
+  setTimeout(() => $('rpNota')?.focus(), 50);
+  $('mCancel').onclick = closeModal;
+  if(cur) $('rpDel').onclick = () => { delete r.reprog; hist(r, 'Tirada da lista de reprogramar'); save(); closeModal(); renderAll(); toast('OS tirada da lista de reprogramar'); };
+  $('mOk').onclick = () => { const nota = $('rpNota').value.trim(), cf = !!$('rpFlag')?.checked; closeModal(); setReprog(oses, nota, cf); };
+}
+// ao programar de novo, sai da lista sozinha
+const _assignRep = assign;
+assign = function(oses, key, date, beforeOs){
+  _assignRep(oses, key, date, beforeOs);
+  let ch = 0; oses.forEach(os => { const r = S.rows[os]; if(isRep(r)){ r.reprog.done = true; r.reprog.doneAt = Date.now(); r.reprog.para = {data:date, alvo:key}; hist(r, `Reprogramada para ${fmtD(date)} · ${alvoNome(key)}`); ch++; } });
+  if(ch) save();
+};
+
+// OS liberadas entram na fila da Programação mesmo que o status oficial não seja pendente
+const _poolRowsRep = poolRows;
+poolRows = function(){ const L = _poolRowsRep(), ids = new Set(L.map(r => r.os)); return L.concat(scopeRows().filter(r => isRep(r) && !ids.has(r.os) && !(r.prog && r.prog.data === UI.pdate))); };
+
+/* ---------- menu Reprogramar ---------- */
+TITLES.reprogramar = ['OS liberadas para ir à rua de novo', 'Reprogramar'];
+UI.rtab = 'abertas'; UI.rq = ''; UI.rsort = 'old';
+function repRows(done){ return rowsArr().filter(r => r.reprog && !!r.reprog.done === done); }
+function renderRep(){
+  const open = repRows(false), done = repRows(true), base = UI.rtab === 'abertas' ? open : done;
+  $('rNOpen').textContent = open.length || ''; $('rNDone').textContent = done.length || '';
+  document.querySelectorAll('#rTab button').forEach(b => b.classList.toggle('on', b.dataset.rt === UI.rtab));
+  const resolved = open.filter(r => isRes(r._st) || r._st === 'cancelada').length;
+  $('rSummary').innerHTML = open.length ? `<b>${open.length}</b> para ir à rua · ${brlK(open.reduce((t, r) => t + (r.debTotal || 0), 0))}${resolved ? ` · <b style="color:#0E7A55">${resolved} já resolvidas no sistema</b>` : ''}` : 'Nenhuma OS esperando reprogramação';
+  $('rSort').value = UI.rsort;
+  let L = base;
+  if(UI.rq){ const q = norm(UI.rq); L = L.filter(r => matchQ(r, UI.rq) || norm(r.reprog.nota || '').includes(q)); }
+  L = L.slice().sort(UI.rsort === 'deb' ? (a, b) => (b.debTotal || 0) - (a.debTotal || 0) : UI.rsort === 'new' ? (a, b) => b.reprog.at - a.reprog.at : (a, b) => a.reprog.at - b.reprog.at);
+  UI.rlist = L.map(r => r.os);
+  const as = alvos();
+  $('rList').innerHTML = L.length ? L.map(r => {
+    const rp = r.reprog, a = addrOf(r.os), age = Math.floor((Date.now() - rp.at) / 86400000), solved = !rp.done && (isRes(r._st) || r._st === 'cancelada');
+    return `<div class="fl-card rp-card" data-ros="${r.os}" style="--c:var(--blue)">
+      <div class="top"><span class="flg" style="--c:var(--blue)">↻ ${rp.done ? 'Reprogramada' : 'Liberada p/ rua'}</span>${stPill(r)}${typeof isFlag === 'function' && isFlag(r) ? flagChip(r) : ''}<span class="age ${!rp.done && age >= 2 ? 'old' : ''}">${rp.done ? `para ${fmtDs(rp.para?.data)} · ${esc(alvoNome(rp.para?.alvo))}` : 'liberada ' + (age === 0 ? 'hoje' : age === 1 ? 'há 1 dia' : `há ${age} dias`)}</span></div>
+      <div class="os"><span class="${r.osAnt?.length ? 'osman' : ''}">${osD(r.os)}</span><button class="copy" data-copy="${osD(r.os)}" title="Copiar OS">⧉</button><small>${esc(r.titular || '')}</small></div>
+      ${rp.nota ? `<div class="txt">${esc(rp.nota)}</div>` : ''}
+      <div class="meta"><span>${a?.end ? esc(addrShort(a)) : esc(titleCase(r.municipio))}</span><span><b>${brl(r.debTotal)}</b></span>${r._mt ? `<span>Último resultado: <b>${esc(r._mt)}</b></span>` : ''}${rp.de ? `<span>Antes: ${fmtDs(rp.de.data)} · ${esc(alvoNome(rp.de.alvo))}</span>` : ''}</div>
+      ${solved ? `<div class="resolved">✓ No sistema já está como "${ST[r._st].l}" — talvez não precise ir à rua.</div>` : ''}
+      <div class="acts">${rp.done ? `<button class="btn sm ghost" data-ropen="${r.os}">Abrir OS</button>`
+        : `<select class="rp-sel" data-rpteam="${r.os}"><option value="">Programar para…</option>${as.map(x => `<option value="${x.key}">${esc(x.nome)}</option>`).join('')}</select><input type="date" class="rp-date" data-rpdate="${r.os}" value="${UI.pdate && UI.pdate >= todayISO() ? UI.pdate : todayISO()}"><button class="btn sm dark" data-rpgo="${r.os}">Programar</button><button class="btn sm ghost" data-ropen="${r.os}">Abrir</button><button class="btn sm soft" data-rpout="${r.os}" title="Tirar da lista">✕</button>`}</div>
+    </div>`; }).join('')
+    : `<div class="fl-empty">${base.length ? 'Nenhuma OS com esse filtro.' : UI.rtab === 'abertas' ? '<h3 style="margin:0 0 6px;font-weight:500;color:var(--ink)">Nada para reprogramar</h3>Abra uma OS e clique em <b>↻ Reprogramar</b> quando ela puder ir à rua de novo.' : 'Nenhuma OS reprogramada ainda.'}</div>`;
+}
+$('rTab').addEventListener('click', e => { const b = e.target.closest('[data-rt]'); if(b){ UI.rtab = b.dataset.rt; renderRep(); } });
+$('rQ').addEventListener('input', e => { UI.rq = e.target.value; renderRep(); });
+$('rSort').addEventListener('change', e => { UI.rsort = e.target.value; renderRep(); });
+$('rCopy').onclick = () => { const L = UI.rlist || []; if(!L.length) return toast('Nenhuma OS na lista'); copy(`${L.length} OS`, null, L.map(osD).join('\n')); };
+$('rGoProg').onclick = () => { UI.pmode = 'quadro'; UI.pchip = 'liber'; setView('programacao'); };
+$('rList').addEventListener('click', e => {
+  const g = e.target.closest('[data-rpgo]');
+  if(g){ const os = g.dataset.rpgo, k = $('rList').querySelector(`[data-rpteam="${os}"]`).value, d = $('rList').querySelector(`[data-rpdate="${os}"]`).value || todayISO();
+    if(!k){ toast('Escolha a equipe'); $('rList').querySelector(`[data-rpteam="${os}"]`).focus(); return; }
+    assign([os], k, d); renderAll(); toast(`OS ${osD(os)} reprogramada para ${fmtD(d)} · ${alvoNome(k)}`); return; }
+  const o = e.target.closest('[data-rpout]'); if(o){ const r = S.rows[o.dataset.rpout]; delete r.reprog; hist(r, 'Tirada da lista de reprogramar'); save(); renderAll(); return; }
+  const op = e.target.closest('[data-ropen]'); if(op){ openDrawer(op.dataset.ropen, UI.rlist); return; }
+  if(e.target.closest('button,select,input')) return;
+  const c = e.target.closest('[data-ros]'); if(c) openDrawer(c.dataset.ros, UI.rlist);
+});
+$('bulkRep').onclick = () => { if(UI.sel.size) openRepModal([...UI.sel]); };
+
+/* ---------- painel da OS: número em destaque, nº antigo, botões ---------- */
+const _rDrawerRep = renderDrawer;
+renderDrawer = function(){
+  _rDrawerRep();
+  const r = DR && S.rows[DR]; if(!r) return;
+  if(r.osAnt?.length){ $('dOs').innerHTML = `<span class="osman" title="Número alterado à mão">${osD(r.os)}</span>`; }
+  const first = $('dBody').querySelector('section.dsec');
+  const box = `<div class="os-actions">
+      <button class="btn sm ghost" data-rename="${r.os}">✎ Alterar nº da OS</button>
+      <button class="btn sm ${isRep(r) ? 'blue' : 'ghost'}" data-rep="${r.os}">↻ ${isRep(r) ? 'Liberada p/ rua · editar' : 'Reprogramar'}</button>
+    </div>
+    ${r.osAnt?.length ? `<div class="osant">Nº anterior: <b>${r.osAnt.map(osD).join(', ')}</b> <button class="copy" data-copy="${osD(r.osAnt[r.osAnt.length - 1])}" title="Copiar nº anterior">⧉</button><span>planilhas com esse número continuam atualizando esta OS</span><button class="lnk" data-unrename="${r.os}">voltar ao anterior</button></div>` : ''}
+    ${isRep(r) ? `<div class="osant" style="background:#EEF3FF;border-color:#C9D8FF;color:var(--blue)">↻ Liberada para ir à rua de novo ${fmtDT(r.reprog.at)}${r.reprog.nota ? ` · ${esc(r.reprog.nota)}` : ''}</div>` : ''}`;
+  if(first) first.insertAdjacentHTML('beforeend', box);
+};
+document.addEventListener('click', e => {
+  const a = e.target.closest('[data-rename]'); if(a){ e.stopPropagation(); openRenameModal(a.dataset.rename); return; }
+  const u = e.target.closest('[data-unrename]'); if(u){ e.stopPropagation(); if(confirm('Voltar esta OS para o número anterior?')) undoRename(u.dataset.unrename); return; }
+  const b = e.target.closest('[data-rep]'); if(b){ e.stopPropagation(); openRepModal(b.dataset.rep); }
+}, true);
+
+/* ---------- integração ---------- */
+const _rShellRep = renderShell;
+renderShell = function(){ _rShellRep(); const n = rowsArr().filter(isRep).length; $('navRep').textContent = n || ''; };
+const _rAllRep = renderAll;
+renderAll = function(){ _rAllRep(); if(UI.view === 'reprogramar') renderRep(); };
 </script>
 <script>
 /* =====================================================================
