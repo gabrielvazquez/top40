@@ -1436,10 +1436,10 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const norm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
 const normKey = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/\s+/g,'_').trim();
-const osD = os => { const s = String(os ?? ''); return /^\d{11,}$/.test(s) ? s.slice(-10) : s; };
-// OS gravada sempre com 10 dígitos (tira os 2 da frente do ID_OS de 12)
-const normOS = v => { const s = String(v ?? '').trim(); return /^\d{11,}$/.test(s) ? s.slice(-10) : s; };
-const k10 = os => { const s = String(os ?? '').replace(/\D/g,''); return s.length > 10 ? s.slice(-10) : s; };
+// OS gravada sem os 2 dígitos da frente do ID_OS ("20"): 202639213730 → 2639213730 · 20269123888 → 269123888
+const normOS = v => { const s = String(v ?? '').trim(); return /^20\d{9,}$/.test(s) ? s.slice(2) : /^\d{11,}$/.test(s) ? s.slice(-10) : s; };
+const osD = os => normOS(os);
+const k10 = os => normOS(String(os ?? '').replace(/\D/g,''));
 const addrOf = os => (typeof S !== 'undefined' && S.addr) ? S.addr[k10(os)] : undefined;
 const pct = (a,b) => b ? Math.round(a/b*100) : 0;
 const brl = n => Number(n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0});
@@ -5521,16 +5521,22 @@ function migrateOS(){
     const cur = S.rows[nk];
     if(cur){ // já existe a de 10 dígitos: junta as duas
       r.semanas.forEach(w => { if(!cur.semanas.includes(w)) cur.semanas.push(w); });
-      ['sys','prog','flag','arrMan','obs'].forEach(f => { if(!cur[f] && r[f]) cur[f] = r[f]; });
+      if(r.sys && (!cur.sys || (r.sys.changedAt || r.sys.at || 0) > (cur.sys.changedAt || cur.sys.at || 0))) cur.sys = r.sys;
+      if(r.prog && (!cur.prog || (r.prog.at || 0) > (cur.prog.at || 0))) cur.prog = r.prog;
+      ['flag','arrMan'].forEach(f => { if(!cur[f] && r[f]) cur[f] = r[f]; });
+      if(r.obs && r.obs !== cur.obs) cur.obs = cur.obs ? cur.obs + ' · ' + r.obs : r.obs;
       cur.hist = [...(r.hist || []), ...(cur.hist || [])].slice(-60);
       BASE_FIELDS.forEach(f => { if((cur[f] === '' || cur[f] == null) && r[f] !== '' && r[f] != null) cur[f] = r[f]; });
     } else { r.os = nk; S.rows[nk] = r; }
     delete S.rows[k]; ren[k] = nk; n++;
   }
+  // endereços: recalcula a chave a partir do número original da OS
+  for(const [k, a] of Object.entries(S.addr || {})){ const nk = a.osSis ? k10(a.osSis) : k10(k); if(nk && nk !== k){ S.addr[nk] = {...a, ...(S.addr[nk] || {})}; delete S.addr[k]; n++; } }
   if(n){
     Object.values(S.ctrl || {}).forEach(m => Object.keys(m).forEach(os => { if(ren[os]){ m[ren[os]] ||= m[os]; delete m[os]; } }));
     rowsArr().forEach(r => { if(r.os !== normOS(r.os)) r.os = normOS(r.os); refresh(r); });
     if(DR && ren[DR]) DR = ren[DR];
+    for(const w of Object.keys(S.weeks || {})) S.weeks[w].count = rowsArr().filter(r => r.semanas.includes(w)).length;
   }
   return n;
 }
