@@ -935,6 +935,15 @@ mark.empty{font-style:italic;font-weight:400}
 .cloud-f input{border:1px solid var(--line2);border-radius:10px;padding:9px 11px;font-size:13px;outline:none;text-transform:none;letter-spacing:0;font-weight:400;color:var(--ink)}
 .cloud-f input:focus{border-color:var(--ink)}
 @media (max-width:700px){.cloud-f{grid-template-columns:1fr}}
+/* ===== serviço / arrecadação manual / excluir ===== */
+#servSel.on{border-color:var(--blue);color:var(--blue);font-weight:600}
+.tag.sv{background:#FFF4E0;color:#A26300}
+.manb{display:inline-block;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:#E3F6EE;color:#0E7A55;border:1px dashed #7FCFAE;border-radius:999px;padding:1px 6px;vertical-align:1px}
+.arrbox{margin-top:10px;background:#F2FBF6;border:1px solid #BFE8D3;border-radius:12px;padding:9px 12px;font-size:13px;color:#0E7A55}
+.arrbox .sub2{margin-top:3px}
+.dr-del{padding:6px 0 18px;text-align:center}
+.dr-del .btn{background:none;color:#D23439;border:1px dashed #F3B4B6}
+.dr-del .btn:hover{background:#FFF1F1}
 </style>
 </head>
 <body>
@@ -969,7 +978,7 @@ mark.empty{font-style:italic;font-weight:400}
       <div class="row"><span class="dot" id="dotPend"></span><span id="footPend">Pendências: nunca atualizadas</span></div>
       <div class="row"><span class="dot ok"></span><span id="footSave">Salvo neste navegador</span></div>
       <div class="row"><span class="cloudst off" id="footCloud" style="cursor:pointer">☁ Nuvem: não conectada</span></div>
-      <div class="row" style="opacity:.6;font-size:11px"><span>Versão 21/10/2026 · v16</span></div>
+      <div class="row" style="opacity:.6;font-size:11px"><span>Versão 23/10/2026 · v17</span></div>
     </div>
   </aside>
 
@@ -992,6 +1001,7 @@ mark.empty{font-style:italic;font-weight:400}
       <div class="head-right">
         <div class="seg" id="weekSeg"></div>
         <select class="pill" id="regSel" title="Regional"></select>
+        <select class="pill" id="servSel" title="Tipo de serviço (Corte, Corte OP, Corte AMI…)"></select>
         <span class="pill" id="periodPill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/></svg><span id="periodTxt">—</span></span>
       </div>
     </div>
@@ -1166,7 +1176,7 @@ mark.empty{font-style:italic;font-weight:400}
     <section class="view" data-view="ordens">
       <div class="otabs" id="stChips"></div>
       <div class="ofil">
-        <select class="pill" id="fTipo"><option value="">Tipo: todos</option><option value="corte">Corte</option><option value="supressao">Supressão</option></select>
+        <select class="pill" id="fTipo" style="display:none"><option value="">Tipo: todos</option><option value="corte">Corte</option><option value="supressao">Supressão</option></select>
         <select class="pill" id="fMun"></select>
         <select class="pill" id="fUni"></select>
         <select class="pill" id="fProg" style="display:none"><option value="">Programação: todas</option><option value="hoje">Programadas hoje</option><option value="com">Com programação</option><option value="sem">Sem programação</option></select>
@@ -1183,6 +1193,8 @@ mark.empty{font-style:italic;font-weight:400}
         <select id="bulkSt" style="display:none"></select>
         <select id="bulkUni"></select>
         <button class="btn sm" id="bulkFlag" style="background:#FFF1F1;color:#D23439"><svg width="14" height="14" style="vertical-align:-2px;margin-right:4px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/></svg>Sinalizar</button>
+        <button class="btn sm" id="bulkArr" style="background:#E3F6EE;color:#0E7A55">$ Arrecadação</button>
+        <button class="btn sm" id="bulkDel" style="background:transparent;color:#F3A1A3">Excluir</button>
         <div class="spacer"></div>
         <button class="btn sm blue" id="bulkExp">Exportar seleção</button>
         <button class="btn sm" id="bulkClear" style="background:transparent;color:#A1A1AA">Limpar</button>
@@ -1424,7 +1436,9 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const norm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
 const normKey = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/\s+/g,'_').trim();
-const osD = os => { const s = String(os ?? ''); return /^20\d{10}$/.test(s) ? s.slice(2) : s; };
+const osD = os => { const s = String(os ?? ''); return /^\d{11,}$/.test(s) ? s.slice(-10) : s; };
+// OS gravada sempre com 10 dígitos (tira os 2 da frente do ID_OS de 12)
+const normOS = v => { const s = String(v ?? '').trim(); return /^\d{11,}$/.test(s) ? s.slice(-10) : s; };
 const k10 = os => { const s = String(os ?? '').replace(/\D/g,''); return s.length > 10 ? s.slice(-10) : s; };
 const addrOf = os => (typeof S !== 'undefined' && S.addr) ? S.addr[k10(os)] : undefined;
 const pct = (a,b) => b ? Math.round(a/b*100) : 0;
@@ -1843,14 +1857,14 @@ function refresh(r){
 }
 const rowsArr = () => Object.values(S.rows);
 const weeksSorted = () => Object.values(S.weeks).sort((a,b)=> (parseInt(a.name.replace(/\D/g,''))||0) - (parseInt(b.name.replace(/\D/g,''))||0) || a.at - b.at).map(w=>w.name);
-function scopeRows(){ return rowsArr().filter(r => (!UI.week || r.semanas.includes(UI.week)) && (!UI.reg || r.regional === UI.reg)); }
+function scopeRows(){ return rowsArr().filter(r => (!UI.week || r.semanas.includes(UI.week)) && (!UI.reg || r.regional === UI.reg) && (!UI.serv || (typeof servMatch === 'function' ? servMatch(r, UI.serv) : true))); }
 function matchQ(r, q){
   if(!q) return true; q = norm(q);
   return norm(`${osD(r.os)} ${r.forn} ${r.titular} ${r.municipio} ${r.regional} ${r._mt} ${r.obs} ${addrOf(r.os)?.end||''} ${addrOf(r.os)?.bairro||''} ${addrOf(r.os)?.ext?.equipe||''}`).includes(q);
 }
 function statOf(list){
   const o = {n:list.length, deb:0, debRes:0, debArr:0, debExec:0}; ST_ORDER.forEach(k=>o[k]=0);
-  for(const r of list){ o[r._st]++; o.deb += r.debTotal||0; if(isRes(r._st)) o.debRes += r.debTotal||0; if(r._st === 'paga') o.debArr += r.debTotal||0; if(r._st === 'executada') o.debExec += r.debTotal||0; }
+  for(const r of list){ o[r._st]++; o.deb += r.debTotal||0; if(isRes(r._st)) o.debRes += r.debTotal||0; if(r._st === 'paga') o.debArr += (r.arrMan ? +r.arrMan.valor || 0 : r.debTotal || 0); if(r._st === 'executada') o.debExec += r.debTotal||0; }
   o.res = o.executada + o.paga; o.base = o.n - o.cancelada; o.taxa = pct(o.res, o.base);
   return o;
 }
@@ -1895,7 +1909,7 @@ function parseSheets(sheets, fileName){
   const {sh, i, keys} = best, recs = [];
   for(const line of sh.rows.slice(i+1)){
     const m = {}; keys.forEach((k,j)=>{ if(k && m[k] === undefined) m[k] = line[j]; });
-    const os = toId(m.os); if(!os || !/\d{5,}/.test(os)) continue;
+    const os = normOS(toId(m.os)); if(!os || !/\d{5,}/.test(os)) continue;
     const s = v => { const t = fixText(v); return t === null || t === undefined ? '' : String(t).trim(); };
     recs.push({os, forn:toId(m.forn), titular:s(m.titular), regional:s(m.regional).toUpperCase(), municipio:s(m.municipio).toUpperCase(), setor:toId(m.setor), atc:toId(m.atc),
       cdTss:toId(m.cdTss), tipoCorte:s(m.tipoCorte).toUpperCase(), servico:s(m.servico), contrato:s(m.contrato), dtGer:toISO(m.dtGer), stForn:s(m.stForn), segmento:s(m.segmento),
@@ -2217,7 +2231,7 @@ function lineSvg(resRows){
   const first = resRows[0]._dt, last = resRows[resRows.length-1]._dt;
   let days = []; for(let d = first; d <= last && days.length < 45; d = addDays(d,1)) days.push(d);
   if(days.length < 2) days = [addDays(first,-1), first];
-  let acc = 0, accN = 0; const pts = days.map(d => { resRows.filter(r=>r._dt===d).forEach(r=>{ acc += r.debTotal||0; accN++; }); return {d, v:acc, n:accN}; });
+  let acc = 0, accN = 0; const pts = days.map(d => { resRows.filter(r=>r._dt===d).forEach(r=>{ acc += (r.arrMan ? +r.arrMan.valor || 0 : r.debTotal || 0); accN++; }); return {d, v:acc, n:accN}; });
   const mx = Math.max(1, acc), x = i => pl + i*(W-pl-pr)/(pts.length-1), y = v => pt + (1 - v/mx)*(H-pt-pb);
   const path = pts.map((p,i)=>`${i?'L':'M'}${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
   const area = path + ` L${x(pts.length-1)},${H-pb} L${x(0)},${H-pb} Z`;
@@ -5301,6 +5315,14 @@ function localSections(){ const c = cleanState(), out = {}; for(const [k, v] of 
 async function cloudPersist(){ try{ await DB.set('cloud', {...CLOUD, busy:false}); }catch(e){} }
 
 /* ---------- HTTP ---------- */
+// aceita a URL do jeito que for colada: https://xxx.supabase.co/rest/v1/, link do dashboard, só o id do projeto…
+function normSbUrl(v){
+  v = String(v || '').trim();
+  let m = v.match(/supabase\.com\/dashboard\/project\/([a-z0-9]{10,})/i); if(m) return `https://${m[1].toLowerCase()}.supabase.co`;
+  if(/^[a-z0-9]{15,30}$/i.test(v)) return `https://${v.toLowerCase()}.supabase.co`;
+  if(!/^https?:\/\//i.test(v)) v = 'https://' + v;
+  try{ const u = new URL(v); return 'https://' + u.host; }catch(e){ return v.replace(/\/+$/, ''); }
+}
 async function sbAuth(path, body){
   const r = await fetch(`${CLOUD.url}/auth/v1/${path}`, {method:'POST', headers:{'apikey':CLOUD.key, 'Content-Type':'application/json'}, body:JSON.stringify(body)});
   const j = await r.json().catch(() => ({}));
@@ -5329,7 +5351,7 @@ async function sb(path, opt = {}){
 function applyRemote(map){
   for(const [k, v] of Object.entries(map)){ S[k] = v; }
   S.weeks ||= {}; S.imports ||= []; S.people ||= {}; S.teams ||= {}; S.sent ||= {}; S.ctrl ||= {}; S.addr ||= {}; S.rows ||= {};
-  if('rows' in map) rowsArr().forEach(refresh);
+  if('rows' in map){ if(typeof migrateOS === 'function') migrateOS(); rowsArr().forEach(refresh); }
   const ws = weeksSorted(); if(!ws.includes(UI.week)) UI.week = ws.length ? ws[ws.length - 1] : '';
 }
 async function pushSections(secs, keys){
@@ -5457,14 +5479,14 @@ function renderCloudCard(){
       <div style="display:flex;gap:8px;margin-top:6px"><button class="btn blue sm" id="cIn">Conectar</button></div>
       <div class="sub2" style="margin-top:8px">A URL e a chave anon ficam em Supabase → Project Settings → API. A chave anon é pública: sem o seu login ela não acessa nada.</div>`;
     $('cIn').onclick = async () => {
-      const url = $('cUrl').value.trim().replace(/\/+$/, ''), key = $('cKey').value.trim(), email = $('cMail').value.trim(), pass = $('cPass').value;
+      const url = normSbUrl($('cUrl').value), key = $('cKey').value.trim(), email = $('cMail').value.trim(), pass = $('cPass').value;
       if(!/^https:\/\/.+/.test(url) || !key || !email || !pass){ $('cErr').textContent = 'Preencha URL, chave, e-mail e senha.'; return; }
       $('cIn').disabled = true; $('cIn').textContent = 'Conectando…';
       try{
         if(CLOUD.url && CLOUD.url !== url) CLOUD.hashes = {};
         Object.assign(CLOUD, {url, key, email}); setSess(await sbAuth('token?grant_type=password', {email, password:pass}));
         CLOUD.err = ''; await cloudPersist(); renderCloudCard(); toast('☁ Conectado — sincronizando…'); await cloudSync();
-      }catch(e){ $('cErr').textContent = /fetch/i.test(e.message) ? 'Não foi possível falar com o Supabase — confira a URL e a internet.' : (/Invalid login/i.test(e.message) ? 'E-mail ou senha incorretos.' : e.message); $('cIn').disabled = false; $('cIn').textContent = 'Conectar'; }
+      }catch(e){ $('cErr').textContent = /invalid path/i.test(e.message) ? 'URL do projeto inválida — use só https://xxxx.supabase.co' : /fetch/i.test(e.message) ? 'Não foi possível falar com o Supabase — confira a URL e a internet.' : (/Invalid login/i.test(e.message) ? 'E-mail ou senha incorretos.' : e.message); $('cIn').disabled = false; $('cIn').textContent = 'Conectar'; }
     };
   }
 }
@@ -5476,7 +5498,7 @@ save = function(){ _saveCloud(); if(!cloudOn()) return; clearTimeout(cloudT); cl
 const _rAllCloud = renderAll;
 renderAll = function(){ _rAllCloud(); if(UI.view === 'config') renderCloudCard(); };
 async function cloudBoot(){
-  try{ const c = await DB.get('cloud'); if(c) CLOUD = {...CLOUD, ...c, busy:false}; }catch(e){}
+  try{ const c = await DB.get('cloud'); if(c) CLOUD = {...CLOUD, ...c, busy:false}; if(CLOUD.url) CLOUD.url = normSbUrl(CLOUD.url); }catch(e){}
   if(!CLOUD.dev) { CLOUD.dev = (navigator.platform || 'pc').slice(0, 12) + '-' + Math.random().toString(36).slice(2, 7); cloudPersist(); }
   cloudStatus(cloudOn() ? 'ok' : 'off');
   if(cloudOn()) cloudSync();
@@ -5485,6 +5507,153 @@ async function cloudBoot(){
   addEventListener('online', () => cloudOn() && cloudSync());
 }
 $('footCloud')?.addEventListener('click', () => setView('config'));
+</script>
+<script>
+/* =====================================================================
+   OS com 10 dígitos · filtro de serviço · excluir OS · arrecadação manual
+   ===================================================================== */
+
+/* ---------- OS: migra as gravadas com 12 dígitos para 10 ---------- */
+function migrateOS(){
+  let n = 0; const ren = {};
+  for(const [k, r] of Object.entries(S.rows || {})){
+    const nk = normOS(k); if(nk === k) continue;
+    const cur = S.rows[nk];
+    if(cur){ // já existe a de 10 dígitos: junta as duas
+      r.semanas.forEach(w => { if(!cur.semanas.includes(w)) cur.semanas.push(w); });
+      ['sys','prog','flag','arrMan','obs'].forEach(f => { if(!cur[f] && r[f]) cur[f] = r[f]; });
+      cur.hist = [...(r.hist || []), ...(cur.hist || [])].slice(-60);
+      BASE_FIELDS.forEach(f => { if((cur[f] === '' || cur[f] == null) && r[f] !== '' && r[f] != null) cur[f] = r[f]; });
+    } else { r.os = nk; S.rows[nk] = r; }
+    delete S.rows[k]; ren[k] = nk; n++;
+  }
+  if(n){
+    Object.values(S.ctrl || {}).forEach(m => Object.keys(m).forEach(os => { if(ren[os]){ m[ren[os]] ||= m[os]; delete m[os]; } }));
+    rowsArr().forEach(r => { if(r.os !== normOS(r.os)) r.os = normOS(r.os); refresh(r); });
+    if(DR && ren[DR]) DR = ren[DR];
+  }
+  return n;
+}
+
+/* ---------- tipo de serviço: Corte, Corte OP, Corte AMI, Corte Dif Com, Supressão… ---------- */
+function servOf(r){
+  if(r._serv !== undefined && r._servK === r.servico + '|' + r.tipoCorte) return r._serv;
+  const sv = norm(r.servico || ''), base = r._tipo === 'supressao' || /SUPRI/.test(sv) ? 'Supressão' : 'Corte';
+  let rest = sv.replace(/^(CORTAR|SUPRIMIR|CORTE|SUPRESSAO)\s+(DE\s+)?(LIGACAO|LIG\.?)\s+(DE\s+)?(AGUA\s+)?(POR\s+)?(DEBITO|DEB\.?)?\s*/, '').trim();
+  if(rest === sv) rest = /\bAMI\b/.test(sv) ? 'AMI' : /\bOP\b/.test(sv) ? 'OP' : /DIF/.test(sv) ? 'DIF COM' : '';
+  if(!sv && /DIF/.test(norm(r.tipoCorte))) rest = 'DIF COM';
+  const lbl = base + (rest ? ' ' + rest.replace(/\bDIF\b/, 'Dif.').replace(/\bCOM\b/, 'Com.').replace(/\s+/g, ' ') : '');
+  Object.defineProperty(r, '_serv', {value:lbl, writable:true, enumerable:false, configurable:true});
+  Object.defineProperty(r, '_servK', {value:r.servico + '|' + r.tipoCorte, writable:true, enumerable:false, configurable:true});
+  return lbl;
+}
+function servMatch(r, f){ return f === '@corte' ? r._tipo === 'corte' : f === '@sup' ? r._tipo === 'supressao' : servOf(r) === f; }
+UI.serv = '';
+function renderServSel(){
+  const base = rowsArr().filter(r => (!UI.week || r.semanas.includes(UI.week)) && (!UI.reg || r.regional === UI.reg));
+  const c = {}; base.forEach(r => { const s = servOf(r); c[s] = (c[s] || 0) + 1; });
+  const ls = Object.keys(c).sort((a, b) => (a.startsWith('Sup') - b.startsWith('Sup')) || c[b] - c[a]);
+  const nC = base.filter(r => r._tipo === 'corte').length, nS = base.length - nC;
+  if(UI.serv && !UI.serv.startsWith('@') && !c[UI.serv]) ls.push(UI.serv);
+  $('servSel').innerHTML = `<option value="">Todos os serviços</option><option value="@corte" ${UI.serv === '@corte' ? 'selected' : ''}>Todos os cortes (${nC})</option><option value="@sup" ${UI.serv === '@sup' ? 'selected' : ''}>Todas as supressões (${nS})</option><optgroup label="Por tipo">` +
+    ls.map(s => `<option value="${esc(s)}" ${UI.serv === s ? 'selected' : ''}>${esc(s)} (${c[s] || 0})</option>`).join('') + '</optgroup>';
+  $('servSel').classList.toggle('on', !!UI.serv);
+}
+$('servSel').addEventListener('change', e => { UI.serv = e.target.value; renderAll(); toast(UI.serv ? `Mostrando: ${$('servSel').selectedOptions[0].text.replace(/\s*\(\d+\)$/, '')}` : 'Todos os serviços'); });
+const _rShellServ = renderShell;
+renderShell = function(){ _rShellServ(); renderServSel(); };
+const _tipoTagServ = tipoTag;
+tipoTag = function(r){ const s = servOf(r); return /\b(OP|AMI)\b/.test(s) ? _tipoTagServ(r) + ` <span class="tag sv">${esc(s.replace(/^(Corte|Supressão)\s*/, ''))}</span>` : _tipoTagServ(r); };
+
+/* ---------- excluir OS manualmente (vai para a lixeira) ---------- */
+function deleteOS(oses){
+  oses = [].concat(oses).filter(os => S.rows[os]); if(!oses.length) return;
+  const now = Date.now(); S.lixeira ||= [];
+  oses.forEach(os => { const r = S.rows[os]; const {_st, _mt, _src, _dt, _tipo, ...rest} = r;
+    S.lixeira.unshift({at:now, row:rest}); delete S.rows[os]; UI.sel?.delete(os); UI.psel?.delete(os);
+    Object.values(S.ctrl || {}).forEach(m => delete m[os]); });
+  S.lixeira = S.lixeira.slice(0, 200);
+  for(const w of Object.keys(S.weeks)) S.weeks[w].count = rowsArr().filter(r => r.semanas.includes(w)).length;
+  S.imports.push({kind:'del', file:'Exclusão manual', at:now, txt:`${oses.length} OS ${oses.length === 1 ? 'excluída' : 'excluídas'} manualmente (${oses.slice(0, 5).map(osD).join(', ')}${oses.length > 5 ? '…' : ''})`});
+  if(DR && oses.includes(DR)) closeDrawer();
+  save(); renderAll(); toast(`${oses.length} OS ${oses.length === 1 ? 'excluída' : 'excluídas'} — dá para recuperar na Lixeira (Configurações)`);
+}
+function askDelete(oses){
+  oses = [].concat(oses); const r = S.rows[oses[0]];
+  const flagged = oses.filter(os => S.rows[os]?.prog || isFlag?.(S.rows[os])).length;
+  openModal(`<h3>Excluir ${oses.length === 1 ? 'OS ' + osD(oses[0]) : oses.length + ' OS'}?</h3>
+    <div class="msub">${oses.length === 1 ? esc(r?.titular || '') + ' · ' : ''}Sai do painel em todas as semanas, junto com programação, observação e sinalização.${flagged ? ` <b>${flagged} ${flagged === 1 ? 'está programada ou sinalizada' : 'estão programadas ou sinalizadas'}.</b>` : ''}<br>Fica na <b>Lixeira</b> (Configurações) e pode ser recuperada. Se vier de novo numa planilha, ela volta.</div>
+    <div class="mfoot"><button class="btn soft" id="mCancel">Cancelar</button><button class="btn danger" id="mOk" style="background:var(--red);color:#fff">Excluir</button></div>`);
+  $('mCancel').onclick = closeModal; $('mOk').onclick = () => { closeModal(); deleteOS(oses); };
+}
+function openLixeira(){
+  const L = S.lixeira || [];
+  openModal(`<h3>Lixeira</h3><div class="msub">OS excluídas manualmente (as 200 mais recentes). Recuperar devolve a OS ao painel como estava.</div>
+    <div class="cl-list" id="lxList">${L.length ? L.map((x, i) => `<div class="cl-it" style="cursor:default"><span>🗑</span><div><b>${osD(x.row.os)} · ${esc(x.row.titular || '')}</b><span>${esc((x.row.semanas || []).join(', '))} · excluída ${fmtDT(x.at)}</span></div><button class="btn sm ghost" data-lx="${i}">Recuperar</button></div>`).join('') : '<div class="empty" style="padding:20px">A lixeira está vazia.</div>'}</div>
+    <div class="mfoot">${L.length ? '<button class="btn soft" id="lxClear" style="margin-right:auto">Esvaziar lixeira</button>' : ''}<button class="btn soft" id="mCancel">Fechar</button></div>`);
+  $('mCancel').onclick = closeModal;
+  if(L.length) $('lxClear').onclick = () => { if(!confirm('Apagar de vez as OS da lixeira?')) return; S.lixeira = []; save(); closeModal(); toast('Lixeira esvaziada'); };
+  $('lxList').onclick = e => { const b = e.target.closest('[data-lx]'); if(!b) return; const x = S.lixeira[+b.dataset.lx]; const os = normOS(x.row.os);
+    if(S.rows[os]){ toast('Essa OS já está no painel'); return; }
+    S.rows[os] = {...x.row, os}; hist(S.rows[os], 'Recuperada da lixeira'); refresh(S.rows[os]); S.lixeira.splice(+b.dataset.lx, 1);
+    for(const w of Object.keys(S.weeks)) S.weeks[w].count = rowsArr().filter(r => r.semanas.includes(w)).length;
+    save(); renderAll(); closeModal(); openLixeira(); toast(`OS ${osD(os)} recuperada`); };
+}
+$('bulkDel').onclick = () => { if(UI.sel.size) askDelete([...UI.sel]); };
+
+/* ---------- arrecadação manual ---------- */
+const arrVal = r => r.arrMan ? +r.arrMan.valor || 0 : (r.debTotal || 0);
+const _refreshArr = refresh;
+refresh = function(r){ _refreshArr(r); if(r.arrMan){ r._st = 'paga'; r._src = 'manual'; r._mt = 'Arrecadação manual' + (r.arrMan.forma ? ' · ' + r.arrMan.forma : ''); r._dt = r.arrMan.data || r._dt; } return r; };
+const _stPillArr = stPill;
+stPill = function(r, big){ return _stPillArr(r, big) + (r.arrMan ? ' <span class="manb" title="Arrecadação registrada à mão">manual</span>' : ''); };
+const ARR_FORMAS = ['Faturas pagas', 'Pagamento via POS', 'Negociação / parcelamento', 'Outro'];
+function openArrModal(oses){
+  oses = [].concat(oses).filter(os => S.rows[os]); if(!oses.length) return;
+  const one = oses.length === 1, r = S.rows[oses[0]], cur = one ? r.arrMan : null;
+  openModal(`<h3>$ Arrecadação manual · ${one ? 'OS ' + osD(oses[0]) : oses.length + ' OS'}</h3>
+    <div class="msub">${one ? esc(r.titular || '') + ' · débito ' + brl2(r.debTotal) + '<br>' : ''}Use quando o pagamento aconteceu mas ainda não apareceu na planilha oficial. A OS conta como <b>Arrecadada</b> no painel, nos rankings e nos Excel.</div>
+    <div class="cloud-f" style="grid-template-columns:${one ? '1fr 1fr' : '1fr'}">
+      ${one ? `<label>Valor arrecadado (R$)<input id="amVal" inputmode="decimal" value="${String(cur?.valor ?? r.debTotal ?? '').replace('.', ',')}"></label>` : ''}
+      <label>Data<input id="amData" type="date" value="${cur?.data || todayISO()}"></label>
+      <label>Forma<select id="amForma" class="bs-in">${ARR_FORMAS.map(f => `<option ${(cur?.forma || ARR_FORMAS[0]) === f ? 'selected' : ''}>${f}</option>`).join('')}</select></label>
+      <label style="grid-column:1/-1">Observação (opcional)<input id="amObs" value="${esc(cur?.obs || '')}" placeholder="Ex.: comprovante enviado pelo cliente no WhatsApp"></label>
+    </div>
+    ${one ? '' : '<div class="sub2" style="margin-top:8px">O valor de cada OS será o débito total dela.</div>'}
+    <div class="mfoot">${cur ? '<button class="btn danger" id="amDel" style="margin-right:auto">Remover arrecadação manual</button>' : ''}<button class="btn soft" id="mCancel">Cancelar</button><button class="btn dark" id="mOk" style="background:#12A372">Registrar arrecadação</button></div>`);
+  $('mCancel').onclick = closeModal;
+  if(cur) $('amDel').onclick = () => { delete r.arrMan; hist(r, 'Arrecadação manual removida'); refresh(r); save(); closeModal(); renderAll(); toast('Arrecadação manual removida'); };
+  $('mOk').onclick = () => {
+    const data = $('amData').value || todayISO(), forma = $('amForma').value, obs = $('amObs').value.trim();
+    let val = null; if(one){ val = toNum($('amVal').value); if(!(val > 0)){ toast('Informe o valor arrecadado'); $('amVal').focus(); return; } }
+    oses.forEach(os => { const x = S.rows[os]; const v = one ? val : (x.debTotal || 0);
+      x.arrMan = {valor:v, data, forma, obs, at:Date.now()}; hist(x, `Arrecadação manual: ${brl2(v)} em ${fmtD(data)} · ${forma}${obs ? ' · ' + obs : ''}`); refresh(x); });
+    save(); closeModal(); renderAll(); UI.sel.clear(); toast(one ? `OS ${osD(oses[0])} arrecadada (${brl2(val)})` : `${oses.length} OS marcadas como arrecadadas`);
+  };
+}
+$('bulkArr').onclick = () => { if(UI.sel.size) openArrModal([...UI.sel]); };
+
+/* painel da OS: botões de arrecadação e excluir */
+const _rDrawerX = renderDrawer;
+renderDrawer = function(){
+  _rDrawerX();
+  const r = DR && S.rows[DR]; if(!r) return;
+  const first = $('dBody').querySelector('section.dsec');
+  if(first){
+    first.insertAdjacentHTML('beforeend', r.arrMan
+      ? `<div class="arrbox"><b>$ Arrecadação manual: ${brl2(r.arrMan.valor)}</b> em ${fmtD(r.arrMan.data)} · ${esc(r.arrMan.forma || '')}${r.arrMan.obs ? `<div class="sub2">${esc(r.arrMan.obs)}</div>` : ''}<button class="lnk" data-arr="${r.os}">editar</button></div>`
+      : `<button class="btn sm ghost" data-arr="${r.os}" style="margin-top:10px;color:#0E7A55;border-color:#9ED9BF">$ Registrar arrecadação manual</button>`);
+  }
+  $('dBody').insertAdjacentHTML('beforeend', `<div class="dr-del"><button class="btn sm" data-delos="${r.os}">🗑 Excluir esta OS do painel</button></div>`);
+};
+document.addEventListener('click', e => {
+  const a = e.target.closest('[data-arr]'); if(a){ e.stopPropagation(); openArrModal(a.dataset.arr); return; }
+  const d = e.target.closest('[data-delos]'); if(d){ e.stopPropagation(); askDelete(d.dataset.delos); }
+}, true);
+
+/* lixeira em Configurações */
+const _rAllX = renderAll;
+renderAll = function(){ _rAllX(); if(UI.view === 'config' && $('storeInfo') && !$('lxBtn')) $('storeInfo').parentElement.insertAdjacentHTML('beforeend', `<div style="margin-top:8px"><button class="btn ghost sm" id="lxBtn">🗑 Lixeira (${(S.lixeira || []).length})</button></div>`); if($('lxBtn')){ $('lxBtn').textContent = `🗑 Lixeira (${(S.lixeira || []).length})`; $('lxBtn').onclick = openLixeira; } };
 </script>
 <script>
 /* =====================================================================
@@ -5544,7 +5713,8 @@ function exportExcel(list, label, tabs = ['resumo','ordens','naoexec','pend']){
     {h:'Débito ARSESP', w:14, v:r=>r.debArsesp, t:'money'},
     {h:'Geração', w:11, v:r=>isoDate(r.dtGer), t:'date'},
     {h:'Status', w:16, v:r=>ST[r._st].l, t:'status'},
-    {h:'Valor arrecadado', w:14, v:r=>r._st==='paga' ? r.debTotal : '', t:'money'},
+    {h:'Valor arrecadado', w:14, v:r=>r._st==='paga' ? (r.arrMan ? +r.arrMan.valor || 0 : r.debTotal) : '', t:'money'},
+    {h:'Arrecadação', w:16, v:r=>r.arrMan ? `Manual · ${fmtD(r.arrMan.data)}${r.arrMan.forma ? ' · ' + r.arrMan.forma : ''}` : (r._st==='paga' ? 'Planilha oficial' : '')},
     {h:'Motivo', w:30, v:r=>r._mt},
     {h:'Observação', w:44, v:r=>r.obs, t:'wrap'},
     {h:'Sinalização', w:42, v:r=>r.flag ? `${r.flag.done?'[concluída] ':''}${flagCat(r.flag.cat).l}: ${r.flag.txt}` : '', t:'wrap'},
@@ -5726,7 +5896,7 @@ function sheetResumo(B, list, sub){
    ===================================================================== */
 (async function init(){
   const st = await DB.get('state');
-  if(st && st.rows){ S = {weeks:{}, imports:[], people:{}, teams:{}, sent:{}, ctrl:{}, addr:{}, ...st}; migrateManual(); }
+  if(st && st.rows){ S = {weeks:{}, imports:[], people:{}, teams:{}, sent:{}, ctrl:{}, addr:{}, ...st}; migrateManual(); if(typeof migrateOS === 'function' && migrateOS()) save(); }
   COORDS = (await DB.get('coords')) || {};
   const ws = weeksSorted(); UI.week = ws.length ? ws[ws.length-1] : '';
   renderAll();
