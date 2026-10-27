@@ -956,6 +956,9 @@ mark.empty{font-style:italic;font-weight:400}
 .rp-card .acts{align-items:center}
 .rp-sel,.rp-date{border:1px solid var(--line2);border-radius:999px;padding:6px 10px;font-size:12.5px;background:#fff;outline:none}
 .rp-sel{max-width:170px}
+.sw-wk{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:14px 0 -4px}
+.sw-wk .sw-wl{font-size:12px;font-weight:600;color:var(--ink2);margin-right:4px}
+.sw-wk .chip{font-size:12px}
 </style>
 </head>
 <body>
@@ -991,7 +994,7 @@ mark.empty{font-style:italic;font-weight:400}
       <div class="row"><span class="dot" id="dotPend"></span><span id="footPend">Pendências: nunca atualizadas</span></div>
       <div class="row"><span class="dot ok"></span><span id="footSave">Salvo neste navegador</span></div>
       <div class="row"><span class="cloudst off" id="footCloud" style="cursor:pointer">☁ Nuvem: não conectada</span></div>
-      <div class="row" style="opacity:.6;font-size:11px"><span>Versão 23/10/2026 · v18</span></div>
+      <div class="row" style="opacity:.6;font-size:11px"><span>Versão 27/10/2026 · v18.1</span></div>
     </div>
   </aside>
 
@@ -5157,18 +5160,26 @@ function rankCands(n, cands){
 const recLine = n => { const a = addrOf(n.os); return [n.titular || '', a?.end ? addrShort(a) : (n.end ? titleCase(n.end) + (n.num ? ', ' + n.num : '') : titleCase(n.municipio || ''))].filter(Boolean).join(' · '); };
 function swapModal(news, opt = {}){
   return new Promise(res => {
-    const cands = swapCands(news, opt);
-    const dec = {}; const used = new Set();
-    // sugestão automática: mesma regional, que saiu da planilha
-    const outAll = cands.filter(x => x.out).length, sure = outAll > 0 && outAll <= news.length; // só sugere quando é inequívoco
-    news.forEach(n => { const c = !sure ? null : rankCands(n, cands).find(x => x.out && !used.has(x.r.os) && (x.r.regional === n.regional || !n.regional)); dec[n.os] = c && opt.suggest !== false ? c.r.os : (opt.defaultAdd ? '__add' : ''); if(c && opt.suggest !== false) used.add(c.r.os); });
+    const allCands = swapCands(news, opt);
+    const dec = {};
+    // filtro por semana: só mostra como candidatas as OS da semana escolhida
+    const wkList = weeksSorted(), wkOut = w => allCands.filter(x => x.out && x.r.semanas.includes(w)).length;
+    let wk = opt.week || '';
+    if(!opt.week){ const best = wkList.slice().sort((a, b) => wkOut(b) - wkOut(a) || wkList.indexOf(b) - wkList.indexOf(a))[0]; wk = (UI.week && wkOut(UI.week)) ? UI.week : (best && wkOut(best) ? best : (UI.week || '')); }
+    let cands = [];
+    const suggest = () => {
+      cands = wk ? allCands.filter(x => x.r.semanas.includes(wk)) : allCands;
+      const used = new Set(), outAll = cands.filter(x => x.out).length, sure = outAll > 0 && outAll <= news.length; // só sugere quando é inequívoco
+      news.forEach(n => { const c = !sure ? null : rankCands(n, cands).find(x => x.out && !used.has(x.r.os) && (x.r.regional === n.regional || !n.regional)); dec[n.os] = c && opt.suggest !== false ? c.r.os : (opt.defaultAdd ? '__add' : (dec[n.os] === '__add' ? '__add' : '')); if(c && opt.suggest !== false) used.add(c.r.os); });
+    };
+    suggest();
     const leftovers = opt.leftovers || [], keep = {}; leftovers.forEach(r => keep[r.os] = 'keep');
     const prog = {}; news.forEach(n => prog[n.os] = true);
     const draw = () => {
       const taken = new Set(Object.values(dec).filter(v => v && v !== '__add'));
       $('swList').innerHTML = news.map(n => {
         const rk = rankCands(n, cands), cur = dec[n.os], old = cur && cur !== '__add' ? S.rows[cur] : null;
-        const opts = rk.map(x => `<option value="${x.r.os}" ${cur === x.r.os ? 'selected' : ''} ${taken.has(x.r.os) && cur !== x.r.os ? 'disabled' : ''}>${osD(x.r.os)} · ${esc((x.r.titular || '').slice(0, 34))} · ${esc(regName(x.r.regional))}${x.out ? ' · não veio na planilha' : ''}</option>`);
+        const opts = rk.map(x => `<option value="${x.r.os}" ${cur === x.r.os ? 'selected' : ''} ${taken.has(x.r.os) && cur !== x.r.os ? 'disabled' : ''}>${osD(x.r.os)} · ${esc((x.r.titular || '').slice(0, 34))} · ${esc(regName(x.r.regional))}${!wk ? ' · ' + esc(x.r.semanas.join(', ')) : ''}${x.out ? ' · não veio na planilha' : ''}</option>`);
         const outN = rk.filter(x => x.out).length;
         return `<div class="sw-row ${old ? 'on' : cur === '__add' ? 'add' : ''}">
           <div class="sw-new"><label>Entra</label><b>${osD(n.os)}</b><span>${esc(recLine(n))}</span><small>${esc(regName(n.regional))}${n.debTotal ? ' · ' + brl(n.debTotal) : ''}</small></div>
@@ -5176,17 +5187,19 @@ function swapModal(news, opt = {}){
           <div class="sw-old"><label>No lugar de</label>
             <select data-sw="${n.os}"><option value="" ${!cur ? 'selected' : ''}>Ignorar esta OS (não entra no painel)</option><option value="__add" ${cur === '__add' ? 'selected' : ''}>Só adicionar (sem trocar nenhuma)</option>
               ${outN ? `<optgroup label="Não vieram nesta planilha">${opts.slice(0, outN).join('')}</optgroup>` : ''}<optgroup label="${outN ? 'Outras OS do painel' : 'OS do painel'}">${opts.slice(outN).join('')}</optgroup></select>
-            ${old ? `<div class="sw-oldinfo"><b>${osD(old.os)}</b> ${stPill(old)} <span>${esc(recLine(old))}</span>${old.prog ? `<label class="sw-chk"><input type="checkbox" data-swprog="${n.os}" ${prog[n.os] ? 'checked' : ''}> passar a programação (${fmtDs(old.prog.data)} · ${esc(alvoNome(old.prog.alvo))}) para a nova</label>` : ''}${typeof isFlag === 'function' && isFlag(old) ? '<span class="ad-tag red">sinalizada</span>' : ''}</div>` : cur === '__add' ? `<div class="sw-oldinfo"><span>Entra na ${esc(opt.addWeek || UI.week || 'semana atual')} sem tirar nenhuma OS.</span></div>` : ''}
+            ${old ? `<div class="sw-oldinfo"><b>${osD(old.os)}</b> ${stPill(old)} <span>${esc(recLine(old))}</span>${old.prog ? `<label class="sw-chk"><input type="checkbox" data-swprog="${n.os}" ${prog[n.os] ? 'checked' : ''}> passar a programação (${fmtDs(old.prog.data)} · ${esc(alvoNome(old.prog.alvo))}) para a nova</label>` : ''}${typeof isFlag === 'function' && isFlag(old) ? '<span class="ad-tag red">sinalizada</span>' : ''}</div>` : cur === '__add' ? `<div class="sw-oldinfo"><span>Entra na ${esc(wk || opt.addWeek || UI.week || 'semana atual')} sem tirar nenhuma OS.</span></div>` : ''}
           </div></div>`; }).join('');
       if(leftovers.length){
         const lo = leftovers.filter(r => !taken.has(r.os));
         $('swLeft').innerHTML = lo.length ? `<div class="sec-t" style="margin-top:16px">Saíram da planilha e não foram trocadas (${lo.length})</div>` + lo.map(r => `<div class="sw-lo"><div><b>${osD(r.os)}</b> ${stPill(r)} <span>${esc(recLine(r))}</span></div><div class="ad-dec"><button data-lo="${r.os}" data-d="keep" class="${keep[r.os] === 'keep' ? 'on' : ''}">Manter na semana</button><button data-lo="${r.os}" data-d="new" class="${keep[r.os] === 'out' ? 'on' : ''}">Tirar da semana</button></div></div>`).join('') : '';
       }
+      if($('swWk')) $('swWk').innerHTML = opt.week ? `<span class="sub2">Semana: <b>${esc(opt.week)}</b></span>` : `<span class="sw-wl">Substituir OS da semana:</span>` + [['', 'Todas', allCands.filter(x => x.out).length], ...wkList.slice().reverse().map(w => [w, w.replace(/^Semana\s*/i, 'Sem '), wkOut(w)])].map(([w, l, n]) => `<button class="chip ${wk === w ? 'on' : ''}" data-swwk="${esc(w)}" title="${n} OS ${w ? 'desta semana ' : ''}não vieram na planilha">${esc(l)}<span class="n">${n}</span></button>`).join('');
       const nSw = news.filter(n => dec[n.os] && dec[n.os] !== '__add').length, nAdd = news.filter(n => dec[n.os] === '__add').length, nIg = news.length - nSw - nAdd;
       $('swCount').innerHTML = `<b>${nSw}</b> troca${nSw === 1 ? '' : 's'} · <b>${nAdd}</b> só adicionada${nAdd === 1 ? '' : 's'} · <b>${nIg}</b> ignorada${nIg === 1 ? '' : 's'}`;
     };
     openModal(`<h3>⇄ Trocar OS</h3>
       <div class="msub"><b>${esc(opt.fileName || '')}</b> ${news.length ? `tem ${news.length} OS que ${news.length === 1 ? 'não está' : 'não estão'} no painel${opt.week ? ` (${esc(opt.week)})` : ''}. Escolha qual OS do painel cada uma substitui — a antiga sai, a nova entra no lugar dela (mesma semana).` : `não traz algumas OS que estavam na ${esc(opt.week || 'semana')}. Escolha se elas continuam ou saem.`}</div>
+      <div class="sw-wk" id="swWk"></div>
       <div class="ad-bar"><span id="swCount"></span></div>
       <div class="ad-list" id="swList"></div><div id="swLeft"></div>
       <div class="mfoot"><button class="btn soft" id="mCancel">Cancelar</button><button class="btn dark" id="mOk">Confirmar</button></div>`);
@@ -5194,9 +5207,12 @@ function swapModal(news, opt = {}){
     draw();
     $('swList').onchange = e => { const s = e.target.closest('[data-sw]'); if(s){ dec[s.dataset.sw] = s.value; draw(); } const c = e.target.closest('[data-swprog]'); if(c) prog[c.dataset.swprog] = c.checked; };
     $('swLeft').onclick = e => { const b = e.target.closest('[data-lo]'); if(b){ keep[b.dataset.lo] = b.dataset.d === 'new' ? 'out' : 'keep'; draw(); } };
+    $('swWk').onclick = e => { const b = e.target.closest('[data-swwk]'); if(!b) return; wk = b.dataset.swwk;
+      news.forEach(n => { const d = dec[n.os]; if(d && d !== '__add' && !cands.some(x => x.r.os === d && (!wk || x.r.semanas.includes(wk)))) dec[n.os] = ''; });
+      suggest(); draw(); };
     UI.onModalClose = () => res(null);
     $('mCancel').onclick = () => closeModal();
-    $('mOk').onclick = () => { UI.onModalClose = () => res({dec, prog, keep}); closeModal(); };
+    $('mOk').onclick = () => { UI.onModalClose = () => res({dec, prog, keep, week:wk}); closeModal(); };
   });
 }
 // executa as trocas. news: [{os, rec?}] ; weekOf(old) = semanas que a nova herda
@@ -5207,11 +5223,11 @@ function doSwaps(news, result, opt = {}){
     const d = result.dec[n.os]; if(!d) return;
     let nr = S.rows[n.os];
     if(d === '__add'){
-      if(!nr){ const w = opt.addWeek || UI.week || weeksSorted().slice(-1)[0] || 'Avulsas'; nr = S.rows[n.os] = newRow(n, w); if(!S.weeks[w]) S.weeks[w] = {name:w, file:fileName, at:now, count:0, period:['','']}; }
+      if(!nr){ const w = opt.addWeek || result.week || UI.week || weeksSorted().slice(-1)[0] || 'Avulsas'; nr = S.rows[n.os] = newRow(n, w); if(!S.weeks[w]) S.weeks[w] = {name:w, file:fileName, at:now, count:0, period:['','']}; }
       nAdd++; return;
     }
     const old = S.rows[d]; if(!old) return;
-    const weeks = opt.week ? [opt.week] : old.semanas.slice();
+    const weeks = opt.week ? [opt.week] : (result.week && old.semanas.includes(result.week)) ? [result.week] : old.semanas.slice();
     if(!nr){ nr = S.rows[n.os] = newRow(n, weeks[0]); nr.hist = []; }
     weeks.forEach(w => { if(!nr.semanas.includes(w)) nr.semanas.push(w); });
     if(old.prog && result.prog[n.os] !== false && !nr.prog){ nr.prog = {...old.prog, at:now}; delete nr.prog.gc; }
