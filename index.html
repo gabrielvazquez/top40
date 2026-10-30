@@ -994,7 +994,7 @@ mark.empty{font-style:italic;font-weight:400}
       <div class="row"><span class="dot" id="dotPend"></span><span id="footPend">Pendências: nunca atualizadas</span></div>
       <div class="row"><span class="dot ok"></span><span id="footSave">Salvo neste navegador</span></div>
       <div class="row"><span class="cloudst off" id="footCloud" style="cursor:pointer">☁ Nuvem: não conectada</span></div>
-      <div class="row" style="opacity:.6;font-size:11px"><span>Versão 27/10/2026 · v18.1</span></div>
+      <div class="row" style="opacity:.6;font-size:11px"><span>Versão 30/10/2026 · v18.2</span></div>
     </div>
   </aside>
 
@@ -1159,7 +1159,7 @@ mark.empty{font-style:italic;font-weight:400}
       <div class="prog-top">
         <span class="sub2" id="lSummary"></span>
         <div class="spacer"></div>
-        <button class="btn dark sm" id="lImport">Importar relatórios de pendências</button>
+        <button class="btn dark sm" id="lImport">Importar relatórios (um ou vários)</button>
         <button class="btn ghost sm" id="lClean" title="Apaga endereços de OS que não estão no painel">Limpar não usados</button>
         <button class="btn blue sm" id="lExport">Exportar localização</button>
         <input type="file" id="fileLoc" accept=".xlsx,.xlsm,.xls,.csv" multiple hidden>
@@ -1197,7 +1197,7 @@ mark.empty{font-style:italic;font-weight:400}
           </div>
           <div class="geo" id="geoPanel"></div>
           <div class="citylist" id="cityAll"></div>
-          <input type="file" id="fileAddr" accept=".xlsx,.xlsm,.xls,.csv" hidden>
+          <input type="file" id="fileAddr" accept=".xlsx,.xlsm,.xls,.csv" multiple hidden>
         </div>
         <div class="card c8" style="padding:8px">
           <div class="mapbox" style="height:calc(100vh - 216px);min-height:420px"><div id="bigMap" style="position:absolute;inset:0"></div><div class="msg" id="bigMapMsg"></div></div>
@@ -2017,20 +2017,48 @@ function applyPend(recs, fileName, addMissingWeek){
 }
 
 async function handleFiles(files, forceKind){
-  const done = [];
-  for(const f of files){
-    let parsed;
-    try{ parsed = parseSheets(await readAnySheet(f), f.name); }
-    catch(e){ toast(e.message || 'Não foi possível ler o arquivo'); continue; }
-    if(!parsed.recs.length){ toast(`Nenhuma OS encontrada em ${f.name}`); continue; }
-    if(parsed.kind === 'addr' || forceKind === 'addr'){ const rv = typeof applyAddrReviewed === 'function' ? await applyAddrReviewed(parsed.recs, f.name, {quiet:false}) : {n:applyAddr(parsed.recs, f.name)}; const n = rv.n; done.push(`${f.name.replace(/\.[^.]+$/,'')}: ${intf(n.total)} OS${Object.keys(n.unis).length?' ('+Object.keys(n.unis).map(uniAbbr).join(', ')+')':''} · ${n.top} do TOP 40${rv.up?` · ${rv.up} ${rv.up===1?'endereço alterado':'endereços alterados'}`:''}${rv.keep?` · ${rv.keep} mantidos (diferentes na planilha)`:''}${n.ign?` · ${intf(n.ign)} fora do painel não guardadas${n.ign <= 30 ? ' ('+n.ignList.map(osD).join(', ')+')' : ''}`:''}`); save(); continue; }
-    const snap = {}; Object.keys(S.weeks).forEach(w => snap[w] = new Set(rowsArr().filter(r => r.semanas.includes(w)).map(r => r.os)));
-    const ok = parsed.kind === 'lista' ? await modalLista(parsed, f.name) : await modalPend(parsed, f.name);
-    if(ok !== false && parsed.kind === 'lista' && typeof listaSwapCheck === 'function') await listaSwapCheck(parsed.recs, UI.week, snap[UI.week], f.name);
-    if(ok !== false && parsed.hasAddr){ if(typeof applyAddrReviewed === 'function') await applyAddrReviewed(parsed.recs, f.name); else applyAddr(parsed.recs, f.name, true); save(); }
+  files = [...files]; if(!files.length) return;
+  // 1) lê todos os arquivos primeiro
+  const parsed = [], fails = [];
+  for(let i = 0; i < files.length; i++){
+    const f = files[i];
+    if(files.length > 1) toast(`Lendo ${i + 1} de ${files.length}: ${f.name}`);
+    try{ const p = parseSheets(await readAnySheet(f), f.name); if(!p.recs.length){ fails.push(`${f.name}: nenhuma OS encontrada`); continue; } p.file = f.name; parsed.push(p); }
+    catch(e){ fails.push(`${f.name}: ${e.message || 'não foi possível ler'}`); }
   }
+  const isAddr = p => p.kind === 'addr' || forceKind === 'addr';
+  // 2) listas e atualizações primeiro (para as OS novas já existirem quando os endereços chegarem)
+  for(const p of parsed.filter(p => !isAddr(p))){
+    const snap = {}; Object.keys(S.weeks).forEach(w => snap[w] = new Set(rowsArr().filter(r => r.semanas.includes(w)).map(r => r.os)));
+    const ok = p.kind === 'lista' ? await modalLista(p, p.file) : await modalPend(p, p.file);
+    if(ok !== false && p.kind === 'lista' && typeof listaSwapCheck === 'function') await listaSwapCheck(p.recs, UI.week, snap[UI.week], p.file);
+    if(ok !== false && p.hasAddr){ if(typeof applyAddrReviewed === 'function') await applyAddrReviewed(p.recs, p.file); else applyAddr(p.recs, p.file, true); save(); }
+  }
+  // 3) todas as planilhas de endereço juntas: uma revisão só e um resumo por arquivo
+  const addrs = parsed.filter(isAddr), done = [];
+  if(addrs.length){
+    const rowKeys = new Set(rowsArr().map(r => k10(r.os))), onlyTop = (S.cfg?.addrOnly !== false) && rowKeys.size > 0;
+    const perFile = addrs.map(p => { const ks = new Set(p.recs.map(r => k10(r.os))); const unis = {}; p.recs.forEach(r => { if(r.unidade) unis[r.unidade] = 1; });
+      return {file:p.file, n:ks.size, top:[...ks].filter(k => rowKeys.has(k)).length, ign:onlyTop ? [...ks].filter(k => !rowKeys.has(k) && !S.addr?.[k]).length : 0, unis:Object.keys(unis)}; });
+    // junta os registros: se a mesma OS vier em mais de um arquivo, vale o último (e completa campos vazios com os anteriores)
+    const byK = new Map();
+    addrs.forEach(p => p.recs.forEach(r => { const k = k10(r.os), prev = byK.get(k); const rr = {...r, _file:p.file};
+      if(prev){ Object.keys(prev).forEach(f => { if((rr[f] === '' || rr[f] == null) && prev[f] !== '' && prev[f] != null) rr[f] = prev[f]; }); }
+      byK.set(k, rr); }));
+    const all = [...byK.values()], label = addrs.length === 1 ? addrs[0].file : `${addrs.length} planilhas de endereço`;
+    const rv = typeof applyAddrReviewed === 'function' ? await applyAddrReviewed(all, label, {quiet:true}) : {n:applyAddr(all, label, true)};
+    const now = Date.now();
+    perFile.forEach(x => { const t = `${x.file.replace(/\.[^.]+$/, '')}: ${intf(x.n)} OS${x.unis.length ? ' (' + x.unis.map(uniAbbr).join(', ') + ')' : ''} · ${x.top} do TOP 40${x.ign ? ` · ${intf(x.ign)} fora do painel não guardadas` : ''}`;
+      done.push(t); S.imports.push({kind:'addr', file:x.file, at:now, txt:t.replace(/^[^:]+:\s*/, '') }); });
+    if(addrs.length > 1) done.push(`Total: ${intf(all.length)} OS diferentes em ${addrs.length} planilhas${all.length < perFile.reduce((t, x) => t + x.n, 0) ? ' (OS repetidas entre arquivos foram juntadas)' : ''}`);
+    if(rv.up || rv.keep) done.push(`Endereços: ${rv.up || 0} alterados · ${rv.keep || 0} mantidos (diferentes na planilha)`);
+    const ign = rv.n?.ignList || []; if(rv.n?.ign && rv.n.ign <= 30) done.push(`Fora do painel: ${ign.map(osD).join(', ')}`);
+    save();
+  }
+  fails.forEach(t => done.push('⚠ ' + t));
   renderAll();
-  if(done.length) locImportModal(done);
+  if(done.length && (addrs.length || fails.length)) locImportModal(done, addrs.length);
+  else if(fails.length) toast(fails[0]);
   if(typeof startGeocode === 'function') startGeocode();
 }
 
@@ -3680,7 +3708,7 @@ function renderGeoPanel(){
     ${running ? `<div class="bar"><i style="width:${pct(GEOQ.done, GEOQ.total)}%"></i></div><div class="sub2">Localizando ${GEOQ.done} de ${GEOQ.total}… pode continuar usando o painel.</div>` : ''}
     ${GEOQ.msg ? `<div class="sub2" style="color:var(--red);margin-top:6px">${esc(GEOQ.msg)}</div>` : ''}
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
-      <button class="btn sm dark" id="geoImp">Importar endereços</button>
+      <button class="btn sm dark" id="geoImp">Importar endereços (um ou vários)</button>
       ${running ? `<button class="btn sm soft" id="geoPause">Pausar</button>` : (st.pend || all.pend ? `<button class="btn sm blue" id="geoGo">Localizar ${all.pend}</button>` : '')}
       ${st.fail ? `<button class="btn sm ghost" id="geoRetry" title="Tenta de novo os não encontrados">Tentar não achadas</button>` : ''}
     </div>
@@ -4038,11 +4066,11 @@ $('lExport').onclick = () => {
     {h:'Programada', w:11, v:r=>isoDate(r.prog?.data), t:'date'}, {h:'Equipe programada', w:22, v:r=>r.prog?alvoNome(r.prog.alvo):''}], R);
   download(B.toBlob(), `TOP40_Localizacao_${todayISO()}.xlsx`); toast('Localização exportada');
 };
-function locImportModal(done){
+function locImportModal(done, nFiles){
   const rowsN = rowsArr().length, loc = rowsArr().filter(r => locOf(r)?.unidade || addrOf(r.os)?.end).length;
-  openModal(`<h3>Localização importada</h3><div class="msub">${done.length} relatório${done.length>1?'s':''} · cruzado pelo número da OS</div>
+  openModal(`<h3>Localização importada</h3><div class="msub">${nFiles ?? done.length} ${(nFiles ?? done.length) === 1 ? 'planilha' : 'planilhas'} · cruzado pelo número da OS</div>
     <div class="mgrid"><div><div class="k">OS do TOP 40</div><div class="v">${intf(rowsN)}</div></div><div><div class="k">Com localização</div><div class="v blue">${intf(loc)}</div></div><div><div class="k">Sem localização</div><div class="v ${rowsN-loc?'red':''}">${intf(rowsN-loc)}</div></div><div><div class="k">No mapa</div><div class="v">${intf(rowsArr().filter(r=>addrOf(r.os)?.lat!=null).length)}</div></div></div>
-    <div class="mlist">${done.map(t=>`<span>• ${esc(t)}</span>`).join('')}<span style="color:var(--ink3)">Endereços sem coordenada estão sendo localizados em segundo plano.</span></div>
+    <div class="mlist">${done.map(t=>`<span style="${/^⚠/.test(t) ? 'color:var(--red)' : /^(Total|Endereços|Fora)/.test(t) ? 'font-weight:600' : ''}">• ${esc(t)}</span>`).join('')}<span style="color:var(--ink3)">Endereços sem coordenada estão sendo localizados em segundo plano.</span></div>
     <div class="mfoot"><button class="btn soft" id="mCancel">Fechar</button><button class="btn ghost" id="mMap">Ver no mapa</button><button class="btn dark" id="mOk">Ver localização</button></div>`);
   $('mCancel').onclick = closeModal;
   $('mMap').onclick = () => { closeModal(); UI.mapGeo = 'os'; setView('mapa'); };
@@ -4843,6 +4871,7 @@ function reviewAddrModal(diffs, fileName){
       const nUp = Object.values(dec).filter(v => v === 'new').length, nKeep = diffs.length - nUp;
       $('adList').innerHTML = diffs.map(d => {
         const r = d.row, pr = r?.prog, tags = [];
+        if(d.rec?._file) tags.push(`<span class="ad-tag" title="Arquivo de onde veio o endereço novo">📄 ${esc(d.rec._file.replace(/\.[^.]+$/, ''))}</span>`);
         if(d.old.src === 'manual') tags.push('<span class="ad-tag warn">pino ajustado à mão</span>');
         else if(d.old.lat != null) tags.push('<span class="ad-tag">já localizada no mapa</span>');
         if(pr && pr.data >= today) tags.push(`<span class="ad-tag blue">programada ${fmtDs(pr.data)} · ${esc(alvoNome(pr.alvo))}</span>`);
