@@ -997,7 +997,7 @@ mark.empty{font-style:italic;font-weight:400}
       <div class="row"><span class="dot" id="dotPend"></span><span id="footPend">Pendências: nunca atualizadas</span></div>
       <div class="row"><span class="dot ok"></span><span id="footSave">Salvo neste navegador</span></div>
       <div class="row"><span class="cloudst off" id="footCloud" style="cursor:pointer">☁ Nuvem: não conectada</span></div>
-      <div class="row" style="opacity:.6;font-size:11px"><span>Versão 09/11/2026 · v19</span></div>
+      <div class="row" style="opacity:.6;font-size:11px"><span>Versão 09/11/2026 · v19.1</span></div>
     </div>
   </aside>
 
@@ -5443,7 +5443,7 @@ async function sb(path, opt = {}){
 function applyRemote(map){
   for(const [k, v] of Object.entries(map)){ S[k] = v; }
   S.weeks ||= {}; S.imports ||= []; S.people ||= {}; S.teams ||= {}; S.sent ||= {}; S.ctrl ||= {}; S.addr ||= {}; S.rows ||= {};
-  if('rows' in map){ if(typeof migrateOS === 'function') migrateOS(); rowsArr().forEach(refresh); }
+  if('rows' in map){ if(typeof migrateOS === 'function') migrateOS(); rowsArr().forEach(refresh); if(typeof fixArrObs === 'function' && fixArrObs()) save(); }
   const ws = weeksSorted(); if(!ws.includes(UI.week)) UI.week = ws.length ? ws[ws.length - 1] : '';
 }
 async function pushSections(secs, keys){
@@ -5701,6 +5701,20 @@ $('bulkDel').onclick = () => { if(UI.sel.size) askDelete([...UI.sel]); };
 
 /* ---------- arrecadação manual ---------- */
 const arrVal = r => r.arrMan ? +r.arrMan.valor || 0 : (r.debTotal || 0);
+// valor digitado na Observação (ex.: "6.684,08") vira o valor arrecadado
+const ARR_NUM_RE = /^\s*(R\$\s*)?(\d{1,3}(\.\d{3})+|\d{1,7})(,\d{1,2})?\s*$/;
+function fixArrObs(){
+  let n = 0;
+  for(const r of Object.values(S.rows || {})){
+    const a = r.arrMan; if(!a || !a.obs || !ARR_NUM_RE.test(a.obs)) continue;
+    const v = toNum(a.obs); if(!(v > 0)) continue;
+    const old = +a.valor || 0; a.valor = v; a.obs = ''; n++;
+    hist(r, `Arrecadação manual corrigida: valor ${brl2(v)} (estava na observação; antes contava ${brl2(old)})`); refresh(r);
+  }
+  return n;
+}
+const _mmArr = migrateManual;
+migrateManual = function(){ const k = fixArrObs(); const n = _mmArr(); if(k) save(); return n; };
 const _refreshArr = refresh;
 refresh = function(r){ _refreshArr(r); if(r.arrMan){ r._st = 'paga'; r._src = 'manual'; r._mt = 'Arrecadação manual' + (r.arrMan.forma ? ' · ' + r.arrMan.forma : ''); r._dt = r.arrMan.data || r._dt; } return r; };
 const _stPillArr = stPill;
@@ -5712,18 +5726,19 @@ function openArrModal(oses){
   openModal(`<h3>$ Arrecadação manual · ${one ? 'OS ' + osD(oses[0]) : oses.length + ' OS'}</h3>
     <div class="msub">${one ? esc(r.titular || '') + ' · débito ' + brl2(r.debTotal) + '<br>' : ''}Use quando o pagamento aconteceu mas ainda não apareceu na planilha oficial. A OS conta como <b>Arrecadada</b> no painel, nos rankings e nos Excel.</div>
     <div class="cloud-f" style="grid-template-columns:${one ? '1fr 1fr' : '1fr'}">
-      ${one ? `<label>Valor arrecadado (R$)<input id="amVal" inputmode="decimal" value="${String(cur?.valor ?? r.debTotal ?? '').replace('.', ',')}"></label>` : ''}
+      ${one ? `<label>Valor pago pelo cliente (R$) <span class="sub2" style="font-weight:400">— é este valor que soma no painel</span><span style="display:flex;gap:6px"><input id="amVal" inputmode="decimal" style="flex:1" placeholder="Ex.: 6.684,08" value="${cur ? String(cur.valor ?? '').replace('.', ',') : ''}"><button type="button" class="btn sm soft" id="amDeb" title="Usar o débito total da OS">= débito</button></span></label>` : ''}
       <label>Data<input id="amData" type="date" value="${cur?.data || todayISO()}"></label>
       <label>Forma<select id="amForma" class="bs-in">${ARR_FORMAS.map(f => `<option ${(cur?.forma || ARR_FORMAS[0]) === f ? 'selected' : ''}>${f}</option>`).join('')}</select></label>
       <label style="grid-column:1/-1">Observação (opcional)<input id="amObs" value="${esc(cur?.obs || '')}" placeholder="Ex.: comprovante enviado pelo cliente no WhatsApp"></label>
     </div>
-    ${one ? '' : '<div class="sub2" style="margin-top:8px">O valor de cada OS será o débito total dela.</div>'}
+    ${one ? '' : '<div class="sub2" style="margin-top:8px">O valor de cada OS será o débito total dela. Para lançar o valor pago de verdade, registre uma OS por vez.</div>'}
     <div class="mfoot">${cur ? '<button class="btn danger" id="amDel" style="margin-right:auto">Remover arrecadação manual</button>' : ''}<button class="btn soft" id="mCancel">Cancelar</button><button class="btn dark" id="mOk" style="background:#12A372">Registrar arrecadação</button></div>`);
   $('mCancel').onclick = closeModal;
+  if(one){ $('amDeb').onclick = () => { $('amVal').value = String(r.debTotal || '').replace('.', ','); $('amVal').focus(); }; setTimeout(() => $('amVal')?.focus(), 50); }
   if(cur) $('amDel').onclick = () => { delete r.arrMan; hist(r, 'Arrecadação manual removida'); refresh(r); save(); closeModal(); renderAll(); toast('Arrecadação manual removida'); };
   $('mOk').onclick = () => {
-    const data = $('amData').value || todayISO(), forma = $('amForma').value, obs = $('amObs').value.trim();
-    let val = null; if(one){ val = toNum($('amVal').value); if(!(val > 0)){ toast('Informe o valor arrecadado'); $('amVal').focus(); return; } }
+    const data = $('amData').value || todayISO(), forma = $('amForma').value; let obs = $('amObs').value.trim();
+    let val = null; if(one){ if(!$('amVal').value.trim() && ARR_NUM_RE.test(obs)){ $('amVal').value = obs; obs = ''; } val = toNum($('amVal').value); if(!(val > 0)){ toast('Informe o valor arrecadado'); $('amVal').focus(); return; } }
     oses.forEach(os => { const x = S.rows[os]; const v = one ? val : (x.debTotal || 0);
       x.arrMan = {valor:v, data, forma, obs, at:Date.now()}; hist(x, `Arrecadação manual: ${brl2(v)} em ${fmtD(data)} · ${forma}${obs ? ' · ' + obs : ''}`); refresh(x); });
     save(); closeModal(); renderAll(); UI.sel.clear(); toast(one ? `OS ${osD(oses[0])} arrecadada (${brl2(val)})` : `${oses.length} OS marcadas como arrecadadas`);
