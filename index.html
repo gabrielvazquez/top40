@@ -719,6 +719,8 @@ body.pm-mapa .pmapv{display:grid}
 .pm-pin.dim{opacity:.25}
 .pm-pin.gc::after{content:'✓';position:absolute;right:-6px;top:-6px;width:13px;height:13px;border-radius:50%;background:var(--green);color:#fff;font-size:8.5px;display:grid;place-items:center;border:1.5px solid #fff}
 .pm-pin{position:relative}
+.pm-pin.fl::before{content:'';position:absolute;left:-5px;top:-5px;width:11px;height:11px;border-radius:50%;background:#FACC15;border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.25)}
+.pm-legend i.fl{background:#FACC15;border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.25)}
 .pm-base{width:30px;height:30px;border-radius:9px;background:var(--ink);color:#fff;display:grid;place-items:center;font-size:14px;border:2.5px solid #fff;box-shadow:0 3px 8px rgba(0,0,0,.35)}
 .pm-km{background:#fff;color:var(--ink);border-radius:999px;padding:1px 7px;font-size:10.5px;font-weight:600;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.2);border:1.5px solid var(--c);display:inline-block;transform:translate(-50%,-50%)}
 .pm-km.far{color:var(--red)}
@@ -771,6 +773,7 @@ tr.flagged td:first-child{box-shadow:inset 3px 0 0 #E5484D}
 .fl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:12px}
 .fl-card{background:var(--card);border-radius:20px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;border-left:5px solid var(--c)}
 .fl-card .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.fl-wk{font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--bg2,#F1F1F4);color:var(--ink2)}
 .fl-card .top .age{margin-left:auto;font-size:12px;color:var(--ink3)}
 .fl-card .top .age.old{color:var(--red);font-weight:600}
 .fl-card .os{font-size:16px;font-weight:600;display:flex;align-items:center;gap:6px}
@@ -994,7 +997,7 @@ mark.empty{font-style:italic;font-weight:400}
       <div class="row"><span class="dot" id="dotPend"></span><span id="footPend">Pendências: nunca atualizadas</span></div>
       <div class="row"><span class="dot ok"></span><span id="footSave">Salvo neste navegador</span></div>
       <div class="row"><span class="cloudst off" id="footCloud" style="cursor:pointer">☁ Nuvem: não conectada</span></div>
-      <div class="row" style="opacity:.6;font-size:11px"><span>Versão 30/10/2026 · v18.2</span></div>
+      <div class="row" style="opacity:.6;font-size:11px"><span>Versão 09/11/2026 · v19</span></div>
     </div>
   </aside>
 
@@ -1148,6 +1151,7 @@ mark.empty{font-style:italic;font-weight:400}
       <div class="fl-cats" id="fCats"></div>
       <div class="fl-tools">
         <input id="fQ" placeholder="Filtrar por OS, titular, motivo, endereço…" autocomplete="off">
+        <select id="fWeek" title="Semana das sinalizadas"></select>
         <select id="fTeam"></select>
         <select id="fSort"><option value="old">Mais antigas primeiro</option><option value="new">Mais recentes primeiro</option><option value="deb">Maior débito</option></select>
       </div>
@@ -4427,7 +4431,7 @@ function drawTeam(M, k, list, opt = {}){
   let prev = rt.base; if(rt.base) line.push([rt.base.lat, rt.base.lon]);
   list.forEach((r, i) => {
     const p = ptOf(r); if(!p) return; const ll = [p.lat, p.lon];
-    const mk = L.marker(ll, {icon:pinIcon(c, r.prog?.ordem || i + 1, (dim ? 'dim ' : '') + (isGc(r) ? 'gc' : '')), zIndexOffset: dim ? 0 : 500, riseOnHover:true});
+    const mk = L.marker(ll, {icon:pinIcon(c, r.prog?.ordem || i + 1, (dim ? 'dim ' : '') + (isGc(r) ? 'gc ' : '') + (isFlag(r) ? 'fl' : '')), zIndexOffset: dim ? 0 : 500, riseOnHover:true});
     mk.bindPopup(osPopup(r)); mk.addTo(M.layer); (M.mk ||= {})[r.os] = mk;
     if(prev && opt.labels && !dim){ const d = hav(prev, p); L.marker([(prev.lat + p.lat)/2, (prev.lon + p.lon)/2], {icon:kmIcon(c, kmFmt(d), d > FAR_KM), interactive:false}).addTo(M.layer); }
     prev = p; line.push(ll);
@@ -4513,19 +4517,19 @@ function renderPMap(){
         <small>${rt.withC > 1 || rt.base ? kmFmt(rt.km) + ' de rota' : 'rota —'}${rt.maxLeg > FAR_KM ? ` · <span style="color:var(--red)">salto de ${kmFmt(rt.maxLeg)}</span>` : ''} · ${g.ok === g.n ? '<span style="color:var(--green)">✓ GeoCall</span>' : `${g.ok}/${g.n} GeoCall`}${rt.noC ? ` · ${rt.noC} sem endereço` : ''}</small></div>`; }).join('')}
     ${f ? `<div class="pm-sec">${baseLineHtml(f)}<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm dark" data-pmact="opt">↯ Otimizar ordem</button>${undo ? '<button class="btn sm soft" data-pmact="undo">Desfazer</button>' : ''}<button class="btn sm ghost" data-pmact="gmaps">Google Maps</button><button class="btn sm ghost" data-pmact="duo">Painel da dupla</button></div>
       <div class="pm-stops">${fl.map((r, i) => { const leg = frt.legs[r.os], p = ptOf(r);
-        return `${leg != null ? `<div class="pm-leg ${leg > FAR_KM ? 'far' : ''}">${i === 0 ? 'da base ' : ''}${kmFmt(leg)}${leg > FAR_KM ? ' · longe' : ''}</div>` : ''}<div class="pm-stop" data-pmstop="${r.os}" style="--c:${teamColor(f)}"><span class="num ${p ? '' : 'nc'}">${r.prog.ordem || i + 1}</span><b>${osD(r.os)}${isGc(r) ? ' <span style="color:var(--green)">✓</span>' : ''}</b><span class="sub2">${brlK(r.debTotal)}</span><small>${esc(r.titular || '')} · ${p ? esc(addrShort(addrOf(r.os))) : '<span style="color:#A26300">sem endereço</span>'}</small></div>`; }).join('')}</div></div>` : ''}
+        return `${leg != null ? `<div class="pm-leg ${leg > FAR_KM ? 'far' : ''}">${i === 0 ? 'da base ' : ''}${kmFmt(leg)}${leg > FAR_KM ? ' · longe' : ''}</div>` : ''}<div class="pm-stop" data-pmstop="${r.os}" style="--c:${teamColor(f)}"><span class="num ${p ? '' : 'nc'}">${r.prog.ordem || i + 1}</span><b>${osD(r.os)}${isGc(r) ? ' <span style="color:var(--green)">✓</span>' : ''}${isFlag(r) ? ` <span title="Sinalizada: ${esc(flagCat(r.flag.cat).l)}" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#FACC15;box-shadow:0 0 0 1px rgba(0,0,0,.25);vertical-align:1px"></span>` : ''}</b><span class="sub2">${brlK(r.debTotal)}</span><small>${esc(r.titular || '')} · ${p ? esc(addrShort(addrOf(r.os))) : '<span style="color:#A26300">sem endereço</span>'}</small></div>`; }).join('')}</div></div>` : ''}
     <div class="pm-sec">
       <label class="pm-opt"><input type="checkbox" id="pmPool" ${UI.pmPool ? 'checked' : ''}> Mostrar OS da fila (não programadas)${UI.pmPool ? ` · ${pool.length}` : ''}</label>
       <div class="pm-opt" style="flex-wrap:wrap">${S.pmBase?.lat != null ? `<span>⌂ Ponto padrão (duplas sem ponto próprio)</span><button class="btn sm soft" data-pmact="base">${UI.pmPick ? 'Clique no mapa…' : 'Mudar'}</button><button class="btn sm ghost" data-pmact="nobase">Remover</button>` : `<button class="btn sm ghost" data-pmact="base" title="Usado pelas duplas que não têm ponto de partida próprio">${UI.pmPick ? 'Clique no mapa…' : '⌂ Ponto padrão p/ todas'}</button>`}</div>
       ${noC ? `<div class="sub2" style="color:#A26300">${noC} OS programadas sem endereço localizado — <a href="#" onclick="setView('localizacao');return false">localizar</a></div>` : ''}
       <div class="sub2">Distâncias em linha reta. Clique num pino para mover de equipe ou marcar no GeoCall.</div>
     </div>`;
-  $('pmLegend').innerHTML = f ? '' : keys.filter(k => !UI.pmHide.has(k)).map(k => `<span style="--c:${teamColor(k)}"><i></i>${esc(alvoNome(k))} · ${colRows(k, d).length}</span>`).join('') + (UI.pmPool && pool.length ? `<span style="--c:#A1A1AA"><i style="border-radius:50%"></i>Fila · ${pool.length}</span>` : '');
+  $('pmLegend').innerHTML = f ? '' : keys.filter(k => !UI.pmHide.has(k)).map(k => `<span style="--c:${teamColor(k)}"><i></i>${esc(alvoNome(k))} · ${colRows(k, d).length}</span>`).join('') + (UI.pmPool && pool.length ? `<span style="--c:#A1A1AA"><i style="border-radius:50%"></i>Fila · ${pool.length}</span>` : '') + (() => { const nf = keys.filter(k => !UI.pmHide.has(k)).reduce((s, k) => s + colRows(k, d).filter(isFlag).length, 0) + (UI.pmPool ? pool.filter(isFlag).length : 0); return nf ? `<span><i class="fl"></i>Sinalizada · ${nf}</span>` : ''; })();
   $('pmMap').parentElement.classList.toggle('pick', UI.pmPick);
   if(!window.L){ $('pmMsg').textContent = 'Mapa indisponível sem internet.'; return; }
   const M = pmEnsure('pmMap'); M.layer.clearLayers(); M.mk = {};
   let fitPts = [];
-  pool.forEach(r => { const p = ptOf(r); const mk = L.circleMarker([p.lat, p.lon], {radius:5, color:'#fff', weight:1.2, fillColor:'#A1A1AA', fillOpacity: f ? .35 : .85}); mk.bindPopup(osPopup(r)); mk.addTo(M.layer); });
+  pool.forEach(r => { const p = ptOf(r); const mk = L.circleMarker([p.lat, p.lon], {radius:5, color:'#fff', weight:1.2, fillColor: isFlag(r) ? '#FACC15' : '#A1A1AA', fillOpacity: f ? .35 : .85}); mk.bindPopup(osPopup(r)); mk.addTo(M.layer); });
   keys.forEach(k => { if(k !== f && (UI.pmHide.has(k) && f !== k)) return; if(f && k !== f) drawTeam(M, k, colRows(k, d), {dim:true}); });
   if(f) fitPts = drawTeam(M, f, fl, {labels:true});
   else keys.filter(k => !UI.pmHide.has(k)).forEach(k => { fitPts = fitPts.concat(drawTeam(M, k, colRows(k, d), {labels:false})); });
@@ -4612,6 +4616,9 @@ const FLAG_CATS = [
   {k:'risco',    l:'Área de risco', c:'#B4232A'},
   {k:'sistema',  l:'Divergência no sistema / GeoCall', c:'#2F6BFF'},
   {k:'retorno',  l:'Aguardando retorno / pagamento', c:'#14B8A6'},
+  {k:'liminar',  l:'Liminar', c:'#DB2777'},
+  {k:'protocolo',l:'Protocolo', c:'#4F46E5'},
+  {k:'concreto', l:'Concreto usinado', c:'#A16207'},
   {k:'outro',    l:'Outro motivo', c:'#5E5E6A'},
 ];
 const FLAG_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5" fill="currentColor" fill-opacity=".25"/></svg>';
@@ -4680,8 +4687,11 @@ renderDrawer = function(){
 
 /* ---------- menu Sinalizadas ---------- */
 TITLES.sinalizadas = ['OS com problema para resolver — sinalizadas por você', 'Sinalizadas'];
-UI.ftab = 'abertas'; UI.fcat = ''; UI.fq = ''; UI.fteam = ''; UI.fsort = 'old';
-function flagRows(done){ return rowsArr().filter(r => r.flag && !!r.flag.done === done); }
+UI.ftab = 'abertas'; UI.fcat = ''; UI.fq = ''; UI.fteam = ''; UI.fsort = 'old'; UI.fweek = '';
+// semana das sinalizadas: '' = segue a semana do painel · '__all' = todas · 'Semana X' = fixa
+const flagWeek = () => UI.fweek === '__all' ? '' : UI.fweek && S.weeks[UI.fweek] ? UI.fweek : (UI.week || '');
+const lastWeekOf = r => { const ws = weeksSorted(); return (r.semanas || []).slice().sort((a, b) => ws.indexOf(a) - ws.indexOf(b)).pop() || ''; };
+function flagRows(done, wk){ const w = wk === undefined ? flagWeek() : wk; return rowsArr().filter(r => r.flag && !!r.flag.done === done && (!w || (r.semanas || []).includes(w))); }
 function renderFlags(){
   const open = flagRows(false), done = flagRows(true), base = UI.ftab === 'abertas' ? open : done;
   $('fNOpen').textContent = open.length || ''; $('fNDone').textContent = done.length || '';
@@ -4694,6 +4704,10 @@ function renderFlags(){
   const teams = [...new Set(base.filter(r => r.prog).map(r => r.prog.alvo))];
   $('fTeam').innerHTML = `<option value="">Todas as equipes</option>` + teams.map(k => `<option value="${k}" ${UI.fteam === k ? 'selected' : ''}>${esc(alvoNome(k))}</option>`).join('') + `<option value="__none" ${UI.fteam === '__none' ? 'selected' : ''}>Sem programação</option>`;
   $('fSort').value = UI.fsort;
+  { const ws = weeksSorted(), allOpen = flagRows(false, ''), nW = w => allOpen.filter(r => (r.semanas || []).includes(w)).length;
+    $('fWeek').innerHTML = `<option value="">Semana do painel${UI.week ? ' (' + esc(UI.week) + ' · ' + nW(UI.week) + ')' : ' (todas)'}</option>` +
+      ws.slice().reverse().map(w => `<option value="${esc(w)}" ${UI.fweek === w ? 'selected' : ''}>${esc(w)} · ${nW(w)} abertas</option>`).join('') +
+      `<option value="__all" ${UI.fweek === '__all' ? 'selected' : ''}>Todas as semanas · ${allOpen.length}</option>`; }
   let L = base;
   if(UI.fcat) L = L.filter(r => r.flag.cat === UI.fcat);
   if(UI.fteam) L = L.filter(r => UI.fteam === '__none' ? !r.prog : r.prog?.alvo === UI.fteam);
@@ -4704,7 +4718,7 @@ function renderFlags(){
     const c = flagCat(r.flag.cat), f = r.flag, age = flagAge(f), a = addrOf(r.os), lo = locOf(r);
     const solved = !f.done && (isRes(r._st) || r._st === 'cancelada');
     return `<div class="fl-card" style="--c:${c.c}" data-fos="${r.os}">
-      <div class="top">${flagChip(r)}${stPill(r)}<span class="age ${!f.done && age >= 3 ? 'old' : ''}">${f.done ? 'concluída ' + fmtDT(f.doneAt) : 'sinalizada ' + ageTxt(age)}</span></div>
+      <div class="top">${flagChip(r)}${stPill(r)}${!flagWeek() && lastWeekOf(r) ? `<span class="fl-wk">${esc(lastWeekOf(r))}</span>` : ''}<span class="age ${!f.done && age >= 3 ? 'old' : ''}">${f.done ? 'concluída ' + fmtDT(f.doneAt) : 'sinalizada ' + ageTxt(age)}</span></div>
       <div class="os">${osD(r.os)}<button class="copy" data-copy="${osD(r.os)}" title="Copiar OS">⧉</button><small>${esc(r.titular || '')}</small></div>
       <div class="txt">${esc(f.txt)}</div>
       <div class="meta"><span>${a?.end ? esc(addrShort(a)) : esc(titleCase(r.municipio))}</span>${lo?.unidade ? `<span><span class="ub">${esc(uniAbbr(lo.unidade))}</span>${lo.setor ? ' Setor ' + esc(lo.setor) : ''}</span>` : ''}<span><b>${brl(r.debTotal)}</b></span>${r.prog ? `<span>Equipe <b>${esc(alvoNome(r.prog.alvo))}</b> · ${fmtDs(r.prog.data)}</span>` : '<span>sem programação</span>'}</div>
@@ -4718,6 +4732,7 @@ $('fTab').addEventListener('click', e => { const b = e.target.closest('[data-ft]
 $('fCats').addEventListener('click', e => { const b = e.target.closest('[data-fcat]'); if(b){ UI.fcat = UI.fcat === b.dataset.fcat ? '' : b.dataset.fcat; renderFlags(); } });
 $('fQ').addEventListener('input', e => { UI.fq = e.target.value; renderFlags(); });
 $('fTeam').addEventListener('change', e => { UI.fteam = e.target.value; renderFlags(); });
+$('fWeek').addEventListener('change', e => { UI.fweek = e.target.value; UI.fcat = ''; renderFlags(); renderShell(); });
 $('fSort').addEventListener('change', e => { UI.fsort = e.target.value; renderFlags(); });
 $('fList').addEventListener('click', e => {
   if(e.target.closest('button')) return;
@@ -4741,7 +4756,7 @@ document.addEventListener('click', e => {
 
 /* contador no menu + render */
 const _rShellFlag = renderShell;
-renderShell = function(){ _rShellFlag(); const n = rowsArr().filter(isFlag).length; $('navFlag').textContent = n || ''; };
+renderShell = function(){ _rShellFlag(); const n = flagRows(false).length; $('navFlag').textContent = n || ''; $('navFlag').title = flagWeek() ? 'Sinalizadas abertas — ' + flagWeek() : 'Sinalizadas abertas — todas as semanas'; };
 const _rAllFlag = renderAll;
 renderAll = function(){ _rAllFlag(); if(UI.view === 'sinalizadas') renderFlags(); };
 
